@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: playkers-booking
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: MONGODB_URI
+        value: mongodb+srv://fixlyplaykers_db_user:fixlyplayker@cluster0.fbleyeo.mongodb.net/
+      - key: SESSION_SECRET
+        value: de411048a8b81adb473e8d935330219adbc6cb8e9a883720395ea4b0e00e3ae5f0841c277a689c3c9a44a9201d4f403143f423ec12a2c96a68bbdeb5d8074fb5
+      - key: NODE_ENV
+        value: production
+      - key: CLOUDINARY_CLOUD_NAME
+        value: dvtubljnk
+      - key: CLOUDINARY_API_KEY
+        value: 316863142429247
+      - key: CLOUDINARY_API_SECRET
+        value: iyWwVpbjpwFmtgjR99kTXNohDJo
