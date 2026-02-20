@@ -15,7 +15,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/use-toast";
 import { apiRequest } from "../lib/queryClient";
 import { insertMatchAvailabilitySchema, insertPlayerAvailabilitySchema, type MatchAvailability, type PlayerAvailability } from "../../../shared/schema";
-import { Calendar as CalendarIcon, MapPin, User, Users, Info, Plus, Search, Trophy, TrendingUp, Filter, ArrowRight } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, User, Users, Info, Plus, Search, Trophy, TrendingUp, Filter, ArrowRight, Phone } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "../lib/utils";
 import { Calendar } from "../components/ui/calendar";
@@ -23,6 +23,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -41,6 +42,12 @@ import {
 } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
 
+interface ContactFormData {
+    name: string;
+    phoneNumber: string;
+    place: string;
+}
+
 export default function Availability() {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -48,6 +55,10 @@ export default function Availability() {
     const [matchDialogOpen, setMatchDialogOpen] = useState(false);
     const [playerDialogOpen, setPlayerDialogOpen] = useState(false);
     const [searchRegion, setSearchRegion] = useState(user?.region || "");
+    const [contactDialogOpen, setContactDialogOpen] = useState(false);
+    const [contactTarget, setContactTarget] = useState<{ postId: string; postType: "match" | "player"; postDescription: string } | null>(null);
+    const [contactForm, setContactForm] = useState<ContactFormData>({ name: "", phoneNumber: "", place: "" });
+    const [contactErrors, setContactErrors] = useState<Partial<ContactFormData>>({});
 
     // Update searchRegion when user region loads
     if (user?.region && !searchRegion) {
@@ -140,7 +151,65 @@ export default function Availability() {
         },
     });
 
+    const contactMutation = useMutation({
+        mutationFn: async (data: ContactFormData & { postId: string; postType: string; postDescription: string }) => {
+            const response = await apiRequest("POST", "/api/availability/contact", {
+                name: data.name,
+                phoneNumber: data.phoneNumber,
+                place: data.place,
+                postId: data.postId,
+                postType: data.postType,
+                postDescription: data.postDescription,
+            });
+            return response.json();
+        },
+        onSuccess: () => {
+            toast({
+                title: "Contact Request Sent! 🎉",
+                description: `Your request has been submitted. You will be contacted at ${contactForm.phoneNumber}.`,
+            });
+            setContactDialogOpen(false);
+            setContactTarget(null);
+            setContactForm({ name: "", phoneNumber: "", place: "" });
+            setContactErrors({});
+        },
+        onError: (error: Error) => {
+            toast({
+                title: "Failed to Send",
+                description: error.message || "Could not submit request. Please try again.",
+                variant: "destructive",
+            });
+        },
+    });
 
+    const validateContact = (): boolean => {
+        const errors: Partial<ContactFormData> = {};
+        if (!contactForm.name.trim()) errors.name = "Name is required";
+        if (!contactForm.phoneNumber.trim()) errors.phoneNumber = "Phone number is required";
+        else if (!/^\d{10}$/.test(contactForm.phoneNumber.replace(/\s/g, "")))
+            errors.phoneNumber = "Enter a valid 10-digit phone number";
+        if (!contactForm.place.trim()) errors.place = "Place is required";
+        setContactErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
+    const handleContactSubmit = () => {
+        if (!contactTarget) return;
+        if (validateContact()) {
+            contactMutation.mutate({ ...contactForm, ...contactTarget });
+        }
+    };
+
+    const openContact = (postId: string, postType: "match" | "player", postDescription: string) => {
+        setContactTarget({ postId, postType, postDescription });
+        setContactForm({
+            name: user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "",
+            phoneNumber: "",
+            place: user?.region || "",
+        });
+        setContactErrors({});
+        setContactDialogOpen(true);
+    };
 
     return (
         <div className="min-h-screen bg-background font-sans">
@@ -466,7 +535,12 @@ export default function Availability() {
                                                     </Avatar>
                                                     <span className="text-sm font-medium">Team Host</span>
                                                 </div>
-                                                <Button variant="ghost" size="sm" className="group/btn">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="group/btn"
+                                                    onClick={() => openContact(post.id, "match", `${post.roleRequired} needed at ${post.location} — ${post.requiredPlayersCount} players`)}
+                                                >
                                                     Contact <ArrowRight className="h-4 w-4 ml-1 group-hover/btn:translate-x-1 transition-transform" />
                                                 </Button>
                                             </div>
@@ -512,8 +586,11 @@ export default function Availability() {
                                                         <p className="text-xs text-muted-foreground">Looking for {post.role} matches</p>
                                                     </div>
                                                 </div>
-                                                <Button className="w-full shadow-md hover:shadow-primary/20 transition-all">
-                                                    Invite to Match
+                                                <Button
+                                                    className="w-full shadow-md hover:shadow-primary/20 transition-all"
+                                                    onClick={() => openContact(post.id, "player", `${post.role} player available in ${post.region}`)}
+                                                >
+                                                    <Phone className="h-4 w-4 mr-2" /> Invite to Match
                                                 </Button>
                                             </div>
                                         </CardContent>
@@ -524,6 +601,99 @@ export default function Availability() {
                     </TabsContent>
                 </Tabs>
             </div>
+
+            {/* Contact Dialog */}
+            <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Phone className="h-5 w-5 text-primary" />
+                            Contact Request
+                        </DialogTitle>
+                        <DialogDescription>
+                            Fill in your details below. They will contact you to arrange the match.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {contactTarget && (
+                        <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground mb-2">
+                            <Info className="h-3 w-3 inline mr-1" />
+                            {contactTarget.postDescription}
+                        </div>
+                    )}
+
+                    <div className="space-y-4 py-2">
+                        {/* Name */}
+                        <div className="space-y-1">
+                            <Label htmlFor="contact-name">Your Name *</Label>
+                            <Input
+                                id="contact-name"
+                                placeholder="Enter your full name"
+                                value={contactForm.name}
+                                onChange={(e) => {
+                                    setContactForm(prev => ({ ...prev, name: e.target.value }));
+                                    if (contactErrors.name) setContactErrors(prev => ({ ...prev, name: "" }));
+                                }}
+                            />
+                            {contactErrors.name && <p className="text-xs text-destructive">{contactErrors.name}</p>}
+                        </div>
+
+                        {/* Phone */}
+                        <div className="space-y-1">
+                            <Label htmlFor="contact-phone">Phone Number *</Label>
+                            <div className="relative">
+                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="contact-phone"
+                                    placeholder="e.g., 9876543210"
+                                    type="tel"
+                                    className="pl-9"
+                                    value={contactForm.phoneNumber}
+                                    onChange={(e) => {
+                                        setContactForm(prev => ({ ...prev, phoneNumber: e.target.value }));
+                                        if (contactErrors.phoneNumber) setContactErrors(prev => ({ ...prev, phoneNumber: "" }));
+                                    }}
+                                />
+                            </div>
+                            {contactErrors.phoneNumber && <p className="text-xs text-destructive">{contactErrors.phoneNumber}</p>}
+                        </div>
+
+                        {/* Place */}
+                        <div className="space-y-1">
+                            <Label htmlFor="contact-place">Your Place / Location *</Label>
+                            <div className="relative">
+                                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="contact-place"
+                                    placeholder="e.g., Coimbatore, Tamil Nadu"
+                                    className="pl-9"
+                                    value={contactForm.place}
+                                    onChange={(e) => {
+                                        setContactForm(prev => ({ ...prev, place: e.target.value }));
+                                        if (contactErrors.place) setContactErrors(prev => ({ ...prev, place: "" }));
+                                    }}
+                                />
+                            </div>
+                            {contactErrors.place && <p className="text-xs text-destructive">{contactErrors.place}</p>}
+                        </div>
+                    </div>
+
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setContactDialogOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={handleContactSubmit}
+                            disabled={contactMutation.isPending}
+                            className="flex items-center gap-2"
+                        >
+                            {contactMutation.isPending ? (
+                                <><span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> Sending...</>
+                            ) : (
+                                <><Phone className="h-4 w-4" /> Send Contact Request</>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

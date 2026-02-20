@@ -2844,6 +2844,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Availability Contact endpoint
+  app.post("/api/availability/contact", requireAuth, async (req: any, res) => {
+    try {
+      const { name, phoneNumber, place, postType, postId, postDescription } = req.body;
+      if (!name || !phoneNumber || !place) {
+        return res.status(400).json({ message: "Name, phone number, and place are required" });
+      }
+
+      const sender = await storage.getUser((req.user as any).id);
+
+      // Store as a notification for the admin
+      const ADMIN_EMAIL = "kit27.ad17@gmail.com";
+      const adminUser = await storage.getUserByEmail(ADMIN_EMAIL);
+
+      const message = `Availability Contact Request:
+Type: ${postType || "availability"}
+Post: ${postDescription || postId}
+Requester Name: ${name}
+Phone: ${phoneNumber}
+Place: ${place}
+Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email || ""})`;
+
+      if (adminUser) {
+        await storage.createNotification({
+          recipientUserId: adminUser.id,
+          senderName: name,
+          senderEmail: sender?.email || "",
+          senderPhone: phoneNumber,
+          senderPlace: place,
+          type: "booking_request",
+          message: message,
+          preferredTiming: `Phone: ${phoneNumber} | Place: ${place}`,
+        });
+      }
+
+      res.json({ message: "Contact request sent successfully" });
+    } catch (error: any) {
+      console.error("Error sending availability contact:", error);
+      res.status(500).json({ message: error.message || "Failed to send contact request" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
