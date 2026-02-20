@@ -29,6 +29,10 @@ import type {
   InsertInvitation,
   Notification,
   InsertNotification,
+  MatchAvailability,
+  InsertMatchAvailability,
+  PlayerAvailability,
+  InsertPlayerAvailability,
 } from "@shared/schema";
 import type { IStorage } from './storage';
 
@@ -46,7 +50,10 @@ export class MemoryStorage implements IStorage {
   private players = new Map<string, Player>();
   private playerPerformances = new Map<string, PlayerPerformance>();
   private invitations = new Map<string, Invitation>();
+
   private notifications = new Map<string, Notification>();
+  private matchAvailability = new Map<string, MatchAvailability>();
+  private playerAvailability = new Map<string, PlayerAvailability>();
 
   constructor() {
     // Initialize with some seed data
@@ -172,7 +179,7 @@ export class MemoryStorage implements IStorage {
     return undefined;
   }
 
-  async createUser(userData: { email: string; password: string; username?: string | null; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null; dateOfBirth?: string | null; location?: string | null; phoneNumber?: string | null; isAdmin?: boolean }): Promise<User> {
+  async createUser(userData: { email: string; password: string; username?: string | null; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null; dateOfBirth?: string | null; location?: string | null; phoneNumber?: string | null; region?: string | null; isAdmin?: boolean }): Promise<User> {
     const hashedPassword = await bcrypt.hash(userData.password, 10);
     const user: User = {
       id: uuidv4(),
@@ -185,12 +192,50 @@ export class MemoryStorage implements IStorage {
       dateOfBirth: userData.dateOfBirth ? new Date(userData.dateOfBirth) : null,
       location: userData.location || null,
       phoneNumber: userData.phoneNumber || null,
+      region: userData.region || null,
       isAdmin: userData.isAdmin || false,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
     this.users.set(user.id, user);
     return user;
+  }
+
+
+
+  // Availability post operations
+  async createMatchAvailability(postData: InsertMatchAvailability): Promise<MatchAvailability> {
+    const post: MatchAvailability = {
+      id: uuidv4(),
+      ...postData,
+      teamId: postData.teamId || null,
+      createdAt: new Date(),
+    };
+    this.matchAvailability.set(post.id, post);
+    return post;
+  }
+
+  async getMatchAvailability(region: string): Promise<MatchAvailability[]> {
+    return Array.from(this.matchAvailability.values())
+      .filter((post) => post.region.toLowerCase() === region.toLowerCase())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async createPlayerAvailability(postData: InsertPlayerAvailability): Promise<PlayerAvailability> {
+    const post: PlayerAvailability = {
+      id: uuidv4(),
+      ...postData,
+      playerId: postData.playerId || null,
+      createdAt: new Date(),
+    };
+    this.playerAvailability.set(post.id, post);
+    return post;
+  }
+
+  async getPlayerAvailability(region: string): Promise<PlayerAvailability[]> {
+    return Array.from(this.playerAvailability.values())
+      .filter((post) => post.region.toLowerCase() === region.toLowerCase())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
@@ -211,6 +256,7 @@ export class MemoryStorage implements IStorage {
         dateOfBirth: userData.dateOfBirth ? new Date(userData.dateOfBirth) : null,
         location: userData.location || null,
         phoneNumber: userData.phoneNumber || null,
+        region: userData.region || null,
         isAdmin: userData.isAdmin || false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -218,6 +264,14 @@ export class MemoryStorage implements IStorage {
       this.users.set(user.id, user);
       return user;
     }
+  }
+
+  async updateUser(id: string, user: Partial<User>): Promise<User | undefined> {
+    const existing = this.users.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...user, updatedAt: new Date() };
+    this.users.set(id, updated);
+    return updated;
   }
 
   async getAllUsers(): Promise<User[]> {
@@ -1020,6 +1074,8 @@ export class MemoryStorage implements IStorage {
       senderName: notificationData.senderName,
       senderEmail: notificationData.senderEmail,
       senderPhone: notificationData.senderPhone,
+      senderPlace: notificationData.senderPlace || null,
+      preferredTiming: notificationData.preferredTiming || null,
       type: notificationData.type,
       bookingId: notificationData.bookingId || null,
       matchType: (notificationData as any).matchType || null,
@@ -1056,4 +1112,6 @@ export class MemoryStorage implements IStorage {
   async deleteNotification(id: string): Promise<boolean> {
     return this.notifications.delete(id);
   }
+
+
 }

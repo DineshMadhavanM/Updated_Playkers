@@ -19,6 +19,9 @@ import {
   insertNotificationSchema,
   Notification,
   Booking,
+  insertMatchAvailabilitySchema,
+  insertPlayerAvailabilitySchema,
+  profileUpdateSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { v2 as cloudinary } from "cloudinary";
@@ -75,6 +78,7 @@ const registerSchema = z.object({
   dateOfBirth: z.string().optional(),
   location: z.string().optional(),
   phoneNumber: z.string().optional(),
+  region: z.string().min(1, "Region is required"),
 });
 
 const loginSchema = z.object({
@@ -100,14 +104,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
+
+
   // Apply CSRF protection to all routes
   app.use(csrfProtection);
 
   // Authentication routes
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { email, password, firstName, lastName, dateOfBirth, location, phoneNumber } = registerSchema.parse(req.body);
-      const user = await registerUser(email, password, firstName, lastName, dateOfBirth, location, phoneNumber);
+      const { email, password, firstName, lastName, dateOfBirth, location, phoneNumber, region } = registerSchema.parse(req.body);
+      const user = await registerUser(email, password, firstName, lastName, dateOfBirth, location, phoneNumber, region);
 
       // Auto-link to player profile if email matches
       try {
@@ -202,12 +208,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     dateOfBirth: z.string().optional(),
     location: z.string().optional(),
     phoneNumber: z.string().optional(),
+    region: z.string().optional(),
   });
 
   app.put('/api/auth/user', requireAuth, async (req: any, res) => {
     try {
       const userId = req.session.user.id;
+      console.log('🔍 [PROFILE UPDATE] req.body.region:', req.body.region);
       const updateData = profileUpdateSchema.parse(req.body);
+      console.log('🔍 [PROFILE UPDATE] updateData.region after parse:', updateData.region);
 
       // Convert empty string username to null for database
       const processedData = {
@@ -216,7 +225,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateOfBirth: updateData.dateOfBirth ? updateData.dateOfBirth : null,
         location: updateData.location || null,
         phoneNumber: updateData.phoneNumber || null,
+        region: updateData.region || null,
       };
+      console.log('🔍 [PROFILE UPDATE] processedData.region:', processedData.region);
 
       // Get current user to preserve existing data
       const currentUser = await storage.getUser(userId);
@@ -235,8 +246,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateOfBirth: processedData.dateOfBirth ? new Date(processedData.dateOfBirth) : null,
         location: processedData.location || null,
         phoneNumber: processedData.phoneNumber || null,
+        region: processedData.region || null,
         isAdmin: currentUser.isAdmin || false, // Preserve existing admin status
       });
+      console.log('🔍 [PROFILE UPDATE] updatedUser.region from DB:', updatedUser.region);
 
       // Auto-link to player profile if email matches
       try {
@@ -250,6 +263,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Remove password from response
       const { password, ...userWithoutPassword } = updatedUser;
+
+      // Update session with new user data
+      (req as any).session.user = userWithoutPassword;
+      (req as any).session.save((err: any) => {
+        if (err) console.error('Failed to save session after profile update:', err);
+      });
+
       res.json({ message: "Profile updated successfully", user: userWithoutPassword });
     } catch (error: any) {
       console.error("Error updating user profile:", error);
@@ -2737,6 +2757,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error accepting booking from notification:", error);
       res.status(500).json({ message: "Failed to accept booking" });
+    }
+  });
+
+  // Availability routes
+  app.post("/api/availability/match", requireAuth, async (req: any, res) => {
+    console.log("POST /api/availability/match - Body:", JSON.stringify(req.body));
+    try {
+      const data = insertMatchAvailabilitySchema.parse({
+        ...req.body,
+        authorId: (req.user as any).id,
+      });
+
+      // Update user's region from the post to ensure profile is in sync
+      if (data.region) {
+        console.log(`Updating user ${(req.user as any).id} region to ${data.region}`);
+        await storage.updateUser((req.user as any).id, { region: data.region });
+      }
+
+      const post = await storage.createMatchAvailability(data);
+      console.log("Match post created:", JSON.stringify(post));
+      res.json(post);
+    } catch (error: any) {
+      console.error("Error creating match availability:", error);
+      res.status(400).json({ message: error.message || "Failed to create match availability" });
+    }
+  });
+
+  app.use("/api/availability/match", (req, res, next) => {
+    console.log(`Middleware check for /api/availability/match: ${req.method} ${req.originalUrl}`);
+    next();
+  });
+
+  app.get("/api/availability/match", requireAuth, async (req: any, res) => {
+    try {
+      const user = await storage.getUser((req.user as any).id);
+      const region = (req.query.region as string) || user?.region;
+
+      if (!region) {
+        return res.json([]);
+      }
+      const posts = await storage.getMatchAvailability(region);
+      res.json(posts);
+    } catch (error) {
+      console.error("Error fetching match availability:", error);
+      res.status(500).json({ message: "Failed to fetch match availability" });
+    }
+  });
+
+
+
+
+  app.post("/api/availability/player", requireAuth, async (req: any, res) => {
+    try {
+      const data = insertPlayerAvailabilitySchema.parse({
+        ...req.body,
+        authorId: (req.user as any).id,
+      });
+
+      // Update user's region from the post to ensure profile is in sync
+      if (data.region) {
+        await storage.updateUser((req.user as any).id, { region: data.region });
+      }
+
+      const post = await storage.createPlayerAvailability(data);
+      res.json(post);
+    } catch (error: any) {
+      console.error("Error creating player availability:", error);
+      res.status(400).json({ message: error.message || "Failed to create player availability" });
+    }
+  });
+
+  app.get("/api/availability/player", requireAuth, async (req: any, res) => {
+    try {
+      const user = await storage.getUser((req.user as any).id);
+      const region = (req.query.region as string) || user?.region;
+
+      if (!region) {
+        return res.json([]);
+      }
+      const posts = await storage.getPlayerAvailability(region);
+      res.json(posts);
+    } catch (error) {
+      console.error("Error fetching player availability:", error);
+      res.status(500).json({ message: "Failed to fetch player availability" });
     }
   });
 

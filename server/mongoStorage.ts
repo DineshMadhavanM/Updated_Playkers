@@ -30,6 +30,10 @@ import type {
   InsertInvitation,
   InsertNotification,
   UpsertUser,
+  MatchAvailability,
+  InsertMatchAvailability,
+  PlayerAvailability,
+  InsertPlayerAvailability,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -50,6 +54,8 @@ export class MongoStorage implements IStorage {
   private playerPerformances: Collection<PlayerPerformance>;
   private invitations: Collection<Invitation>;
   private notifications: Collection<Notification>;
+  private matchAvailability: Collection<MatchAvailability>;
+  private playerAvailability: Collection<PlayerAvailability>;
 
   constructor(uri: string) {
     // Configure MongoDB client options for Replit compatibility
@@ -78,6 +84,8 @@ export class MongoStorage implements IStorage {
     this.playerPerformances = this.db.collection<PlayerPerformance>('playerPerformances');
     this.invitations = this.db.collection<Invitation>('invitations');
     this.notifications = this.db.collection<Notification>('notifications');
+    this.matchAvailability = this.db.collection<MatchAvailability>('matchAvailability');
+    this.playerAvailability = this.db.collection<PlayerAvailability>('playerAvailability');
   }
 
   async connect(): Promise<void> {
@@ -154,6 +162,15 @@ export class MongoStorage implements IStorage {
         { unique: true, sparse: true }
       );
       console.log('✅ Created players email+teamId compound index');
+
+      // Create unique index on user id
+      await this.users.createIndex({ id: 1 }, { unique: true });
+      console.log('✅ Created users id unique index');
+
+
+
+
+
     } catch (error) {
       console.warn('⚠️ Index creation warning (may already exist):', error);
     }
@@ -194,6 +211,7 @@ export class MongoStorage implements IStorage {
     dateOfBirth?: string | null;
     location?: string | null;
     phoneNumber?: string | null;
+    region?: string | null;
     isAdmin?: boolean;
   }): Promise<User> {
     const id = `user-${this.generateId()}`;
@@ -208,6 +226,7 @@ export class MongoStorage implements IStorage {
       dateOfBirth: userData.dateOfBirth ? new Date(userData.dateOfBirth) : null,
       location: userData.location || null,
       phoneNumber: userData.phoneNumber || null,
+      region: userData.region || null,
       isAdmin: userData.isAdmin || false,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -249,6 +268,15 @@ export class MongoStorage implements IStorage {
     }
 
     return result as User;
+  }
+
+  async updateUser(id: string, user: Partial<User>): Promise<User | undefined> {
+    const result = await this.users.findOneAndUpdate(
+      { id } as any,
+      { $set: { ...user, updatedAt: new Date() } },
+      { returnDocument: 'after' }
+    );
+    return result || undefined;
   }
 
   // Admin-specific methods
@@ -2533,6 +2561,8 @@ export class MongoStorage implements IStorage {
       bookingId: notificationData.bookingId || null,
       matchType: notificationData.matchType || null,
       location: notificationData.location || null,
+      senderPlace: notificationData.senderPlace || null,
+      preferredTiming: notificationData.preferredTiming || null,
       message: notificationData.message || null,
       status: 'unread',
       createdAt: new Date(),
@@ -2575,5 +2605,43 @@ export class MongoStorage implements IStorage {
   async deleteNotification(id: string): Promise<boolean> {
     const result = await this.notifications.deleteOne({ id } as any);
     return result.deletedCount > 0;
+  }
+
+  // Match Availability methods
+  async createMatchAvailability(post: InsertMatchAvailability): Promise<MatchAvailability> {
+    const id = `match-avail-${this.generateId()}`;
+    const newPost: MatchAvailability = {
+      id,
+      ...post,
+      teamId: post.teamId || null,
+      createdAt: new Date(),
+    };
+    await this.matchAvailability.insertOne(newPost as any);
+    return newPost;
+  }
+
+  async getMatchAvailability(region: string): Promise<MatchAvailability[]> {
+    return await this.matchAvailability.find({
+      region: { $regex: new RegExp(`^${region}$`, 'i') }
+    }).sort({ createdAt: -1 }).toArray();
+  }
+
+  // Player Availability methods
+  async createPlayerAvailability(post: InsertPlayerAvailability): Promise<PlayerAvailability> {
+    const id = `player-avail-${this.generateId()}`;
+    const newPost: PlayerAvailability = {
+      id,
+      ...post,
+      playerId: post.playerId || null,
+      createdAt: new Date(),
+    };
+    await this.playerAvailability.insertOne(newPost as any);
+    return newPost;
+  }
+
+  async getPlayerAvailability(region: string): Promise<PlayerAvailability[]> {
+    return await this.playerAvailability.find({
+      region: { $regex: new RegExp(`^${region}$`, 'i') }
+    }).sort({ createdAt: -1 }).toArray();
   }
 }
