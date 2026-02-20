@@ -13,6 +13,7 @@ export const insertUserSchema = z.object({
   dateOfBirth: z.string().nullable().optional(),
   location: z.string().nullable().optional(),
   phoneNumber: z.string().nullable().optional(),
+  region: z.string().min(1, "Region is required"),
   isAdmin: z.boolean().optional(),
 });
 
@@ -25,6 +26,7 @@ export const profileUpdateSchema = z.object({
   dateOfBirth: z.string().optional(),
   location: z.string().optional(),
   phoneNumber: z.string().optional(),
+  region: z.string().optional(),
 });
 
 // Venue validation schemas
@@ -754,6 +756,7 @@ export type User = {
   dateOfBirth: Date | null;
   location: string | null;
   phoneNumber: string | null;
+  region: string | null;
   isAdmin: boolean | null;
   // Cricket statistics for linked players
   cricketStats?: {
@@ -1203,3 +1206,55 @@ export type Notification = {
 };
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// Match Availability validation schemas
+export const insertMatchAvailabilitySchema = z.object({
+  matchDate: z.coerce.date(),
+  location: z.string().min(1, "Location is required"),
+  region: z.string().min(1, "Region is required"),
+  requiredPlayersCount: z.number().min(1, "Required players count must be at least 1"),
+  roleRequired: z.string().min(1, "Role is required"),
+  description: z.string().min(1, "Description is required"),
+  teamId: z.string().optional().nullable(),
+  authorId: z.string(),
+});
+
+// Match Availability type
+export type MatchAvailability = {
+  id: string;
+  matchDate: Date;
+  location: string;
+  region: string;
+  requiredPlayersCount: number;
+  roleRequired: string;
+  description: string;
+  teamId: string | null;
+  authorId: string;
+  createdAt: Date;
+};
+
+export type InsertMatchAvailability = z.infer<typeof insertMatchAvailabilitySchema>;
+
+// Player Availability validation schemas
+export const insertPlayerAvailabilitySchema = z.object({
+  availableDate: z.coerce.date(),
+  role: z.string().min(1, "Role is required"),
+  region: z.string().min(1, "Region is required"),
+  experience: z.string().min(1, "Experience is required"),
+  playerId: z.string().optional().nullable(),
+  authorId: z.string(),
+});
+
+// Player Availability type
+export type PlayerAvailability = {
+  id: string;
+  availableDate: Date;
+  role: string;
+  region: string;
+  experience: string;
+  playerId: string | null;
+  authorId: string;
+  createdAt: Date;
+};
+
+export type InsertPlayerAvailability = z.infer<typeof insertPlayerAvailabilitySchema>;
