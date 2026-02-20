@@ -2595,6 +2595,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/notifications/:id/accept-booking", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      // Get the notification being accepted
+      const allNotifications = await storage.getNotifications(user.id);
+      const notification = allNotifications.find(n => n.id === req.params.id);
+
+      if (!notification) {
+        return res.status(404).json({ message: "Booking request notification not found" });
+      }
+
+      // Mark this notification as accepted
+      const updatedNotification = await storage.updateNotificationStatus(req.params.id, "accepted");
+
+      // Send a booking_accepted notification back to the requester
+      try {
+        const accepterName = user.firstName && user.lastName
+          ? `${user.firstName} ${user.lastName}`
+          : user.email;
+
+        // Try to find the requester as a user or player to send them a notification
+        const senderUser = await storage.getUserByEmail(notification.senderEmail);
+        let recipientUserId: string | undefined;
+        let recipientPlayerId: string | undefined;
+
+        if (senderUser) {
+          recipientUserId = senderUser.id;
+        } else {
+          // Try player
+          const senderPlayer = await storage.getPlayerByEmail(notification.senderEmail);
+          if (senderPlayer) {
+            recipientPlayerId = senderPlayer.id;
+          }
+        }
+
+        if (recipientUserId || recipientPlayerId) {
+          await storage.createNotification({
+            recipientUserId: recipientUserId,
+            recipientPlayerId: recipientPlayerId,
+            recipientEmail: notification.senderEmail,
+            senderName: accepterName,
+            senderEmail: user.email,
+            senderPhone: user.phoneNumber || "Not provided",
+            type: "booking_accepted",
+            message: `${accepterName} accepted your booking request! They will contact you to finalize the details.`,
+          });
+          console.log(`✅ Sent booking_accepted notification to ${notification.senderEmail}`);
+        } else {
+          console.log(`⚠️  Could not find user/player for ${notification.senderEmail} to send acceptance`);
+        }
+      } catch (notifError) {
+        console.error("Error sending booking_accepted notification:", notifError);
+        // Don't fail the main request
+      }
+
+      res.json(updatedNotification);
+    } catch (error) {
+      console.error("Error accepting booking notification:", error);
+      res.status(500).json({ message: "Failed to accept booking" });
+    }
+  });
+
   app.patch("/api/notifications/:id/status", async (req, res) => {
     try {
       const user = (req as any).user;
