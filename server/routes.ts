@@ -2602,52 +2602,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      // Get the notification being accepted
-      const allNotifications = await storage.getNotifications(user.id);
-      const notification = allNotifications.find(n => n.id === req.params.id);
+      // Directly mark notification as accepted by its ID (no user-scoped filter)
+      const updatedNotification = await storage.updateNotificationStatus(req.params.id, "accepted");
 
-      if (!notification) {
+      if (!updatedNotification) {
         return res.status(404).json({ message: "Booking request notification not found" });
       }
 
-      // Mark this notification as accepted
-      const updatedNotification = await storage.updateNotificationStatus(req.params.id, "accepted");
-
-      // Send a booking_accepted notification back to the requester
+      // Send a booking_accepted notification back to the original requester
       try {
         const accepterName = user.firstName && user.lastName
           ? `${user.firstName} ${user.lastName}`
           : user.email;
 
-        // Try to find the requester as a user or player to send them a notification
-        const senderUser = await storage.getUserByEmail(notification.senderEmail);
-        let recipientUserId: string | undefined;
-        let recipientPlayerId: string | undefined;
+        const senderEmail = updatedNotification.senderEmail;
+        if (senderEmail) {
+          const senderUser = await storage.getUserByEmail(senderEmail);
+          let recipientUserId: string | undefined;
+          let recipientPlayerId: string | undefined;
 
-        if (senderUser) {
-          recipientUserId = senderUser.id;
-        } else {
-          // Try player
-          const senderPlayer = await storage.getPlayerByEmail(notification.senderEmail);
-          if (senderPlayer) {
-            recipientPlayerId = senderPlayer.id;
+          if (senderUser) {
+            recipientUserId = senderUser.id;
+          } else {
+            const senderPlayer = await storage.getPlayerByEmail(senderEmail);
+            if (senderPlayer) {
+              recipientPlayerId = senderPlayer.id;
+            }
           }
-        }
 
-        if (recipientUserId || recipientPlayerId) {
-          await storage.createNotification({
-            recipientUserId: recipientUserId,
-            recipientPlayerId: recipientPlayerId,
-            recipientEmail: notification.senderEmail,
-            senderName: accepterName,
-            senderEmail: user.email,
-            senderPhone: user.phoneNumber || "Not provided",
-            type: "booking_accepted",
-            message: `${accepterName} accepted your booking request! They will contact you to finalize the details.`,
-          });
-          console.log(`✅ Sent booking_accepted notification to ${notification.senderEmail}`);
-        } else {
-          console.log(`⚠️  Could not find user/player for ${notification.senderEmail} to send acceptance`);
+          if (recipientUserId || recipientPlayerId) {
+            await storage.createNotification({
+              recipientUserId,
+              recipientPlayerId,
+              recipientEmail: senderEmail,
+              senderName: accepterName,
+              senderEmail: user.email,
+              senderPhone: (user as any).phoneNumber || "Not provided",
+              type: "booking_accepted",
+              message: `${accepterName} accepted your booking request! They will contact you to finalize the details.`,
+            });
+            console.log(`✅ Sent booking_accepted notification to ${senderEmail}`);
+          }
         }
       } catch (notifError) {
         console.error("Error sending booking_accepted notification:", notifError);
