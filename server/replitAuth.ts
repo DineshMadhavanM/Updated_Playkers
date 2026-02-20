@@ -24,7 +24,7 @@ const getOidcConfig = memoize(
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  
+
   // Use memory store for session storage
   // Note: Sessions will not persist between server restarts
   console.log("✅ Using memory-based session store");
@@ -61,6 +61,7 @@ async function upsertUser(
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
+    username: claims["preferred_username"] || null,
     // password is optional for OAuth users
     firstName: claims["first_name"] || null,
     lastName: claims["last_name"] || null,
@@ -68,6 +69,7 @@ async function upsertUser(
     dateOfBirth: null,
     location: null,
     phoneNumber: null,
+    region: null,
     isAdmin: false,
     // createdAt/updatedAt are handled by storage layer
   });

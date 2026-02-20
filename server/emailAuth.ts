@@ -54,7 +54,7 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 }
 
 // Register user
-export async function registerUser(email: string, password: string, firstName?: string, lastName?: string, dateOfBirth?: string, location?: string, phoneNumber?: string) {
+export async function registerUser(email: string, password: string, firstName?: string, lastName?: string, dateOfBirth?: string, location?: string, phoneNumber?: string, region?: string) {
   try {
     // Check if user already exists
     const existingUser = await storage.getUserByEmail(email);
@@ -74,6 +74,7 @@ export async function registerUser(email: string, password: string, firstName?: 
       dateOfBirth: dateOfBirth || null,
       location: location || null,
       phoneNumber: phoneNumber || null,
+      region: region || null,
       isAdmin: isAdmin,
     });
 

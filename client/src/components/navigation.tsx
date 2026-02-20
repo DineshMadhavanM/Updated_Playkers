@@ -42,6 +42,7 @@ export default function Navigation() {
     { href: "/venues", label: "Venues", active: location === "/venues" },
     { href: "/matches", label: "Matches", active: location === "/matches" },
     { href: "/teams", label: "Teams", active: location.startsWith("/teams") },
+    { href: "/availability", label: "Availability", active: location === "/availability" },
     { href: "/shop", label: "Shop", active: location === "/shop" },
   ];
 

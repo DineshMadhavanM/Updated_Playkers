@@ -21,6 +21,7 @@ import MatchSpectator from "@/pages/match-spectator";
 import Admin from "@/pages/admin";
 import PlayerProfile from "@/pages/player-profile";
 import AcceptInvite from "@/pages/accept-invite";
+import Availability from "./pages/Availability";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -55,6 +56,7 @@ function Router() {
       <Route path="/teams/:id" component={TeamDetail} />
       <Route path="/players/:id" component={PlayerProfile} />
       <Route path="/profile" component={Profile} />
+      <Route path="/availability" component={Availability} />
       <Route path="/shop" component={Shop} />
       <Route path="/create-match" component={CreateMatch} />
       <Route path="/match/:id/score" component={MatchScorer} />

@@ -27,6 +27,10 @@ import type {
   InsertInvitation,
   Notification,
   InsertNotification,
+  MatchAvailability,
+  InsertMatchAvailability,
+  PlayerAvailability,
+  InsertPlayerAvailability,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -34,8 +38,9 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: { email: string; password: string; username?: string | null; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null; dateOfBirth?: string | null; location?: string | null; phoneNumber?: string | null; isAdmin?: boolean }): Promise<User>;
+  createUser(user: { email: string; password: string; username?: string | null; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null; dateOfBirth?: string | null; location?: string | null; phoneNumber?: string | null; region?: string | null; isAdmin?: boolean }): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<User>): Promise<User | undefined>;
 
   // Admin operations
   getAllUsers?(): Promise<User[]>;
@@ -279,7 +284,14 @@ export interface IStorage {
   getUnreadNotificationCount(recipientId: string): Promise<number>;
   updateNotificationStatus(id: string, status: "read" | "accepted" | "declined"): Promise<Notification | undefined>;
   deleteNotification(id: string): Promise<boolean>;
+
+  // Availability post operations
+  createMatchAvailability(post: InsertMatchAvailability): Promise<MatchAvailability>;
+  getMatchAvailability(region: string): Promise<MatchAvailability[]>;
+  createPlayerAvailability(post: InsertPlayerAvailability): Promise<PlayerAvailability>;
+  getPlayerAvailability(region: string): Promise<PlayerAvailability[]>;
 }
+
 
 // MongoDB Storage Implementation
 import { MongoStorage } from './mongoStorage';

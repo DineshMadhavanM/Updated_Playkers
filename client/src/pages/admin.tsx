@@ -31,6 +31,8 @@ interface User {
   dateOfBirth?: string | null;
   location?: string | null;
   phoneNumber?: string | null;
+  region?: string | null;
+  isAdmin?: boolean | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -282,7 +284,7 @@ export default function Admin() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {users.filter(user => 
+                  {users.filter(user =>
                     user.firstName && user.lastName && user.dateOfBirth && user.location
                   ).length}
                 </div>
@@ -320,6 +322,7 @@ export default function Admin() {
                         <TableHead>User</TableHead>
                         <TableHead>Contact</TableHead>
                         <TableHead>Personal Info</TableHead>
+                        <TableHead>Region</TableHead>
                         <TableHead>Joined</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="w-[100px]">Actions</TableHead>
@@ -366,11 +369,20 @@ export default function Admin() {
                               )}
                             </div>
                           </TableCell>
+                          <TableCell>
+                            {user.region ? (
+                              <Badge variant="outline" className="text-xs" data-testid={`badge-user-region-${user.id}`}>
+                                {user.region}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           <TableCell data-testid={`text-user-created-${user.id}`}>
                             {formatDate(user.createdAt)}
                           </TableCell>
                           <TableCell>
-                            <Badge 
+                            <Badge
                               variant={user.firstName && user.lastName ? "default" : "secondary"}
                               data-testid={`badge-user-status-${user.id}`}
                             >
@@ -502,7 +514,7 @@ export default function Admin() {
                 Check which players have registered emails and manage their account linkages
               </CardDescription>
               <div className="flex justify-end">
-                <Button 
+                <Button
                   onClick={() => refetchEmailCheck()}
                   variant="outline"
                   size="sm"

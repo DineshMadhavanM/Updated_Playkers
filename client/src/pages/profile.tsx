@@ -48,6 +48,7 @@ const profileSchema = z.object({
   dateOfBirth: z.string().optional(),
   location: z.string().optional(),
   phoneNumber: z.string().optional(),
+  region: z.string().optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -81,15 +82,32 @@ export default function Profile() {
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      firstName: user?.firstName || "",
-      lastName: user?.lastName || "",
-      email: user?.email || "",
-      username: user?.username || "",
-      dateOfBirth: user?.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : "",
-      location: user?.location || "",
-      phoneNumber: user?.phoneNumber || "",
+      firstName: "",
+      lastName: "",
+      email: "",
+      username: "",
+      dateOfBirth: "",
+      location: "",
+      phoneNumber: "",
+      region: "",
     },
   });
+
+  // Sync form values whenever user data loads or changes
+  useEffect(() => {
+    if (user) {
+      form.reset({
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "",
+        username: user.username || "",
+        dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : "",
+        location: user.location || "",
+        phoneNumber: user.phoneNumber || "",
+        region: user.region || "",
+      });
+    }
+  }, [user, form]);
 
   const { data: userStats = [] } = useQuery<UserStats[]>({
     queryKey: ["/api/user/stats"],
@@ -360,6 +378,13 @@ export default function Profile() {
                         {user.location}
                       </div>
                     )}
+                    {user?.region && (
+                      <div className="flex items-center gap-1" data-testid="text-user-region">
+                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                          {user.region} Region
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -464,6 +489,19 @@ export default function Profile() {
                             <FormLabel>Phone Number</FormLabel>
                             <FormControl>
                               <Input {...field} placeholder="+91 12345 67890" data-testid="input-phone" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="region"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Region (Required)</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="e.g. North, South, East, West" data-testid="input-region" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

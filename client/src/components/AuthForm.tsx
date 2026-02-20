@@ -25,6 +25,7 @@ const registerSchema = z.object({
   lastName: z.string().trim().min(1, "Last name is required"),
   dateOfBirth: z.string().min(1, "Date of birth is required"),
   location: z.string().min(1, "City name is required"),
+  region: z.string().min(1, "Region is required"),
   phoneNumber: z.string().min(10, "Please enter a valid phone number"),
 });
 
@@ -59,6 +60,7 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
       lastName: "",
       dateOfBirth: "",
       location: "",
+      region: "",
       phoneNumber: "",
     },
   });
@@ -80,7 +82,7 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
     },
     onError: (error: any) => {
       let errorMessage = "Invalid email or password. Please try again.";
-      
+
       // Extract user-friendly message from error response
       // Error format from queryClient: "401: {"message":"Invalid email or password"}"
       if (error.message && typeof error.message === 'string') {
@@ -98,7 +100,7 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
           }
         }
       }
-      
+
       toast({
         title: "Login failed",
         description: errorMessage,
@@ -124,7 +126,7 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
     },
     onError: (error: any) => {
       let errorMessage = "Failed to create account. Please try again.";
-      
+
       // Extract user-friendly message from error response
       // Error format from queryClient: "400: {"message":"Email already exists"}"
       if (error.message && typeof error.message === 'string') {
@@ -142,7 +144,7 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
           }
         }
       }
-      
+
       toast({
         title: "Registration failed",
         description: errorMessage,
@@ -174,7 +176,7 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
               <TabsTrigger value="login" data-testid="tab-login">Login</TabsTrigger>
               <TabsTrigger value="register" data-testid="tab-register">Sign Up</TabsTrigger>
             </TabsList>
-            
+
             {/* Login Tab */}
             <TabsContent value="login" className="space-y-4">
               <Form {...loginForm}>
@@ -237,9 +239,9 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
                       </FormItem>
                     )}
                   />
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
+                  <Button
+                    type="submit"
+                    className="w-full"
                     disabled={loginMutation.isPending}
                     data-testid="button-login-submit"
                   >
@@ -397,6 +399,27 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
                   />
                   <FormField
                     control={registerForm.control}
+                    name="region"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Region</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              placeholder="Enter your region (e.g. Tamil Nadu)"
+                              className="pl-10"
+                              data-testid="input-register-region"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={registerForm.control}
                     name="phoneNumber"
                     render={({ field }) => (
                       <FormItem>
@@ -417,9 +440,9 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
                       </FormItem>
                     )}
                   />
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
+                  <Button
+                    type="submit"
+                    className="w-full"
                     disabled={registerMutation.isPending}
                     data-testid="button-register-submit"
                   >
