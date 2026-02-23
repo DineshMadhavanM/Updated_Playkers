@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Trash2, User, Users, Calendar, MapPin, Phone, Mail, Link as LinkIcon, Link2Off, CheckCircle, XCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Trash2, User, Users, Calendar, MapPin, Phone, Mail, Link as LinkIcon, Link2Off, CheckCircle, XCircle, AlertCircle, Loader2, ShieldCheck } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,18 @@ interface EmailCheckResponse {
   players: PlayerEmailStatus[];
 }
 
+interface TeamRole {
+  id: string;
+  name: string;
+  email: string | null;
+  teamRole: string;
+  teamId: string;
+  teamName: string;
+  userId: string | null;
+  userEmail: string | null;
+  userDisplayName: string | null;
+}
+
 export default function Admin() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -85,7 +97,6 @@ export default function Admin() {
     queryKey: ["/api/admin/users/count"],
   });
 
-  // Query player email status
   const {
     data: emailCheckData,
     isLoading: isLoadingEmailCheck,
@@ -93,6 +104,16 @@ export default function Admin() {
     refetch: refetchEmailCheck
   } = useQuery<EmailCheckResponse>({
     queryKey: ["/api/admin/check-player-emails"],
+  });
+
+  // Query team roles
+  const {
+    data: teamRoles = [],
+    isLoading: isLoadingTeamRoles,
+    error: teamRolesError,
+    refetch: refetchTeamRoles
+  } = useQuery<TeamRole[]>({
+    queryKey: ["/api/admin/team-roles"],
   });
 
   // Delete user mutation
@@ -237,6 +258,10 @@ export default function Admin() {
           <TabsTrigger value="email-verification" className="flex items-center gap-2">
             <Mail className="h-4 w-4" />
             Email Verification
+          </TabsTrigger>
+          <TabsTrigger value="team-roles" className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" />
+            Team Roles
           </TabsTrigger>
         </TabsList>
 
@@ -654,6 +679,95 @@ export default function Admin() {
                                 </Button>
                               )}
                             </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="team-roles">
+          <Card data-testid="card-team-roles">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Team Administrators</CardTitle>
+                  <CardDescription>
+                    Manage and view all users with Team Admin or Co-Admin roles
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={() => refetchTeamRoles()}
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-refresh-team-roles"
+                >
+                  Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingTeamRoles ? (
+                <div className="text-center py-8" data-testid="loading-team-roles">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-2 text-muted-foreground">Fetching team roles...</p>
+                </div>
+              ) : teamRolesError ? (
+                <div className="text-center py-8" data-testid="error-team-roles">
+                  <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                  <p className="text-red-600 mb-2">Failed to load team roles</p>
+                  <Button onClick={() => refetchTeamRoles()} variant="outline">
+                    Try Again
+                  </Button>
+                </div>
+              ) : teamRoles.length === 0 ? (
+                <div className="text-center py-8" data-testid="no-team-roles">
+                  <ShieldCheck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No team administrators found</p>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Player Profile</TableHead>
+                        <TableHead>Team</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Linked User Account</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {teamRoles.map((role) => (
+                        <TableRow key={role.id}>
+                          <TableCell>
+                            <div className="font-medium">{role.name}</div>
+                            <div className="text-sm text-muted-foreground">{role.email || "No email"}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">{role.teamName}</div>
+                            <div className="text-xs text-muted-foreground">ID: {role.teamId}</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={role.teamRole === 'admin' ? "default" : "secondary"}>
+                              {role.teamRole.charAt(0) ? role.teamRole.charAt(0).toUpperCase() + role.teamRole.slice(1) : role.teamRole}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {role.userId ? (
+                              <div>
+                                <div className="font-bold">{role.userDisplayName || "Anonymous"}</div>
+                                <div className="text-sm text-muted-foreground">{role.userEmail}</div>
+                                <div className="text-[10px] text-muted-foreground">User ID: {role.userId}</div>
+                              </div>
+                            ) : (
+                              <Badge variant="outline" className="text-orange-500 border-orange-200">
+                                Not Linked to Account
+                              </Badge>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

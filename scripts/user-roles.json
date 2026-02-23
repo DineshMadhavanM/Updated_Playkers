@@ -1,0 +1,29 @@
+{
+  "user": {
+    "id": "user-1757687394439-gjouvxuu8",
+    "_id": "68c42e627a8e0ec000f62bd8",
+    "email": "kit27.ad17@gmail.com",
+    "isAdmin": true
+  },
+  "players": [
+    {
+      "id": "player-1758012123910-za7jkzolo",
+      "_id": "68c922db937684414d8272fe",
+      "userId": "user-1757687394439-gjouvxuu8",
+      "email": "kit27.ad17@gmail.com",
+      "teamId": "team-1758012088301-ca05z5x5i",
+      "teamRole": "admin"
+    },
+    {
+      "id": "player-1762236108147-bidzrwwzn",
+      "_id": "690996ccbaa10c5077b60e48",
+      "userId": null,
+      "email": "kit27.ad17@gmail.com",
+      "teamId": "team-1761277252184-006rxmeku"
+    }
+  ],
+  "jokerTeam": {
+    "id": "team-1758012088301-ca05z5x5i",
+    "name": "Jokers"
+  }
+}

@@ -81,7 +81,16 @@ export default function AcceptInvite() {
         if (invitation?.invitationType === "match" && invitation?.matchId) {
           setLocation(`/matches/${invitation.matchId}`);
         } else if (invitation?.invitationType === "team" && invitation?.teamId) {
-          setLocation(`/teams/${invitation.teamId}`);
+          // If it was a match challenge (has inviterTeamId), redirect to create-match
+          if (invitation.inviterTeamId) {
+            const params = new URLSearchParams();
+            params.set('sport', invitation.sport || 'cricket');
+            if (invitation.inviterTeamId) params.set('team1', invitation.inviterTeamId);
+            if (invitation.teamId) params.set('team2', invitation.teamId);
+            setLocation(`/create-match?${params.toString()}`);
+          } else {
+            setLocation(`/teams/${invitation.teamId}`);
+          }
         } else {
           setLocation("/");
         }

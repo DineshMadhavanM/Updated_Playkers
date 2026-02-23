@@ -39,10 +39,10 @@ const matchSchema = z.object({
 const cricketOversOptions = Array.from({ length: 50 }, (_, i) => `${i + 1} Overs`);
 
 const sportOptions = [
-  { 
-    value: "cricket", 
-    label: "Cricket", 
-    types: ["Test", ...cricketOversOptions] 
+  {
+    value: "cricket",
+    label: "Cricket",
+    types: ["Test", ...cricketOversOptions]
   },
   { value: "football", label: "Football", types: ["90 min", "60 min", "7-a-side", "5-a-side"] },
   { value: "volleyball", label: "Volleyball", types: ["Best of 3", "Best of 5", "Time-based"] },
@@ -61,14 +61,13 @@ export default function CreateMatch() {
   const [selectedTeam, setSelectedTeam] = useState<string>(""); // For backward compatibility when team1 is pre-filled
   const [selectedTeam1, setSelectedTeam1] = useState<string>(""); // For team 1 selection when not pre-filled
   const [selectedTeam2, setSelectedTeam2] = useState<string>(""); // For team 2 selection when not pre-filled
-  const [team1Id, setTeam1Id] = useState<string>("");
-  const [team2Id, setTeam2Id] = useState<string>("");
-  
-  // URL parameters for pre-filled data
   const urlParams = new URLSearchParams(window.location.search);
   const prefilledSport = urlParams.get('sport');
   const prefilledTeam1Id = urlParams.get('team1');
   const prefilledTeam2Id = urlParams.get('team2');
+
+  const [team1Id, setTeam1Id] = useState<string>(prefilledTeam1Id || "");
+  const [team2Id, setTeam2Id] = useState<string>(prefilledTeam2Id || "");
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -126,7 +125,7 @@ export default function CreateMatch() {
       if (!response.ok) throw new Error('Failed to fetch team 1');
       return response.json();
     },
-    enabled: isAuthenticated && !!prefilledTeam1Id,
+    enabled: isAuthenticated && !!prefilledTeam1Id && prefilledTeam1Id !== "undefined",
   });
 
   const { data: prefilledTeam2 } = useQuery({
@@ -136,29 +135,29 @@ export default function CreateMatch() {
       if (!response.ok) throw new Error('Failed to fetch team 2');
       return response.json();
     },
-    enabled: isAuthenticated && !!prefilledTeam2Id,
+    enabled: isAuthenticated && !!prefilledTeam2Id && prefilledTeam2Id !== "undefined",
   });
 
-  // Fetch players for Team 1
+  // Fetch players for Team 1 — key includes 'team1' to avoid RQ cache collision with team2
   const { data: team1Players = [], isLoading: team1PlayersLoading } = useQuery({
-    queryKey: ['/api/players', team1Id],
+    queryKey: ['/api/players', 'team1', team1Id],
     queryFn: async (): Promise<any[]> => {
       const response = await fetch(`/api/players?teamId=${team1Id}`);
       if (!response.ok) throw new Error('Failed to fetch team 1 players');
       return response.json();
     },
-    enabled: isAuthenticated && !!team1Id,
+    enabled: isAuthenticated && !!team1Id && team1Id !== 'undefined',
   });
 
-  // Fetch players for Team 2  
+  // Fetch players for Team 2 — key includes 'team2' to avoid RQ cache collision with team1
   const { data: team2Players = [], isLoading: team2PlayersLoading } = useQuery({
-    queryKey: ['/api/players', team2Id],
+    queryKey: ['/api/players', 'team2', team2Id],
     queryFn: async (): Promise<any[]> => {
       const response = await fetch(`/api/players?teamId=${team2Id}`);
       if (!response.ok) throw new Error('Failed to fetch team 2 players');
       return response.json();
     },
-    enabled: isAuthenticated && !!team2Id,
+    enabled: isAuthenticated && !!team2Id && team2Id !== 'undefined',
   });
 
   // Helper function to map database Player to CricketTeamRoster Player
@@ -192,7 +191,7 @@ export default function CreateMatch() {
       setSelectedTeam(prefilledTeam2.id); // Sync selectedTeam state
       setTeam2Id(prefilledTeam2.id); // Track team2 ID
     }
-    
+
     // Generate a default title with available team names
     if (prefilledTeam1?.name && prefilledTeam2?.name) {
       const defaultTitle = `${prefilledTeam1.name} vs ${prefilledTeam2.name}`;
@@ -202,14 +201,24 @@ export default function CreateMatch() {
     }
   }, [prefilledTeam1, prefilledTeam2, form]);
 
-  // Handle opponent selection changes (when team1 is pre-filled)
+  // Auto-select prefilledTeam2 as the opponent:
+  // Directly set form values and team2Id so we don't rely on the selectedTeam → opponent-effect chain
   useEffect(() => {
-    if (selectedTeam && allTeams.length > 0 && prefilledTeam1) {
+    if (prefilledTeam2) {
+      form.setValue('team2Name', prefilledTeam2.name);
+      setTeam2Id(prefilledTeam2.id);
+      setSelectedTeam(prefilledTeam2.id); // keep dropdown in sync if visible
+    }
+  }, [prefilledTeam2, form]);
+
+  // Handle opponent selection changes (when team1 is pre-filled but team2 is NOT pre-filled)
+  useEffect(() => {
+    if (selectedTeam && allTeams.length > 0 && prefilledTeam1 && !prefilledTeam2) {
       const selectedTeamData = allTeams.find(team => team.id === selectedTeam);
       if (selectedTeamData) {
         form.setValue('team2Name', selectedTeamData.name);
         setTeam2Id(selectedTeamData.id); // Track team2 ID
-        
+
         // Update title if we have both teams
         const defaultTitle = `${prefilledTeam1.name} vs ${selectedTeamData.name}`;
         if (!form.getValues('title') || form.getValues('title') === '') {
@@ -226,7 +235,7 @@ export default function CreateMatch() {
       if (selectedTeam1Data) {
         form.setValue('team1Name', selectedTeam1Data.name);
         setTeam1Id(selectedTeam1Data.id); // Track team1 ID
-        
+
         // Update title if we have both teams
         if (selectedTeam2) {
           const selectedTeam2Data = allTeams.find(team => team.id === selectedTeam2);
@@ -248,7 +257,7 @@ export default function CreateMatch() {
       if (selectedTeam2Data) {
         form.setValue('team2Name', selectedTeam2Data.name);
         setTeam2Id(selectedTeam2Data.id); // Track team2 ID
-        
+
         // Update title if we have both teams
         if (selectedTeam1) {
           const selectedTeam1Data = allTeams.find(team => team.id === selectedTeam1);
@@ -267,7 +276,7 @@ export default function CreateMatch() {
   // Reset and reinitialize when team1Id changes or when team1Players are loaded
   useEffect(() => {
     if (team1Id && team1Players.length > 0) {
-      const mappedPlayers = team1Players.map((player, index) => 
+      const mappedPlayers = team1Players.map((player, index) =>
         mapDatabasePlayerToRosterPlayer({ ...player, position: index + 1 })
       );
       setTeam1Roster(mappedPlayers.slice(0, 15)); // Limit to 15 players
@@ -279,7 +288,7 @@ export default function CreateMatch() {
   // Reset and reinitialize when team2Id changes or when team2Players are loaded  
   useEffect(() => {
     if (team2Id && team2Players.length > 0) {
-      const mappedPlayers = team2Players.map((player, index) => 
+      const mappedPlayers = team2Players.map((player, index) =>
         mapDatabasePlayerToRosterPlayer({ ...player, position: index + 1 })
       );
       setTeam2Roster(mappedPlayers.slice(0, 15)); // Limit to 15 players
@@ -295,7 +304,7 @@ export default function CreateMatch() {
         scheduledAt: new Date(data.scheduledAt), // Send Date object, not ISO string
         venueId: "temp-venue", // Temporary - will be handled by backend
       };
-      
+
       const matchResponse = await apiRequest("POST", "/api/matches", matchData);
       return matchResponse.json();
     },
@@ -371,14 +380,14 @@ export default function CreateMatch() {
       // Check for required roles (captain or captain-wicket-keeper)
       const team1Captain = team1Roster.find(p => p.role === "captain" || p.role === "captain-wicket-keeper");
       const team2Captain = team2Roster.find(p => p.role === "captain" || p.role === "captain-wicket-keeper");
-      const team1WicketKeeper = team1Roster.find(p => 
-        p.role === "wicket-keeper" || 
-        p.role === "captain-wicket-keeper" || 
+      const team1WicketKeeper = team1Roster.find(p =>
+        p.role === "wicket-keeper" ||
+        p.role === "captain-wicket-keeper" ||
         p.role === "vice-captain-wicket-keeper"
       );
-      const team2WicketKeeper = team2Roster.find(p => 
-        p.role === "wicket-keeper" || 
-        p.role === "captain-wicket-keeper" || 
+      const team2WicketKeeper = team2Roster.find(p =>
+        p.role === "wicket-keeper" ||
+        p.role === "captain-wicket-keeper" ||
         p.role === "vice-captain-wicket-keeper"
       );
 
@@ -402,37 +411,37 @@ export default function CreateMatch() {
     }
 
     // Include roster data in the submission for cricket matches
-    const matchData = selectedSport === "cricket" 
+    const matchData = selectedSport === "cricket"
       ? {
-          ...data,
-          team1Name: allTeams.find(t => t.id === team1Id)?.name || data.team1Name,
-          team2Name: allTeams.find(t => t.id === team2Id)?.name || data.team2Name,
-          matchData: {
-            team1Id,
-            team2Id,
-            team1Roster: team1Roster.map(player => ({
-              playerId: player.id,
-              name: player.name,
-              role: player.role,
-              battingStyle: player.battingStyle,
-              bowlingStyle: player.bowlingStyle,
-              position: player.position,
-              isRegisteredUser: player.isRegisteredUser,
-              userId: player.userId,
-            })),
-            team2Roster: team2Roster.map(player => ({
-              playerId: player.id,
-              name: player.name,
-              role: player.role,
-              battingStyle: player.battingStyle,
-              bowlingStyle: player.bowlingStyle,
-              position: player.position,
-              isRegisteredUser: player.isRegisteredUser,
-              userId: player.userId,
-            })),
-            sport: "cricket"
-          }
+        ...data,
+        team1Name: allTeams.find(t => t.id === team1Id)?.name || data.team1Name,
+        team2Name: allTeams.find(t => t.id === team2Id)?.name || data.team2Name,
+        matchData: {
+          team1Id,
+          team2Id,
+          team1Roster: team1Roster.map(player => ({
+            playerId: player.id,
+            name: player.name,
+            role: player.role,
+            battingStyle: player.battingStyle,
+            bowlingStyle: player.bowlingStyle,
+            position: player.position,
+            isRegisteredUser: player.isRegisteredUser,
+            userId: player.userId,
+          })),
+          team2Roster: team2Roster.map(player => ({
+            playerId: player.id,
+            name: player.name,
+            role: player.role,
+            battingStyle: player.battingStyle,
+            bowlingStyle: player.bowlingStyle,
+            position: player.position,
+            isRegisteredUser: player.isRegisteredUser,
+            userId: player.userId,
+          })),
+          sport: "cricket"
         }
+      }
       : data;
 
     createMatchMutation.mutate(matchData);
@@ -441,7 +450,7 @@ export default function CreateMatch() {
   return (
     <div className="min-h-screen bg-background" data-testid="create-match-page">
       <Navigation />
-      
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Create New Match</h1>
@@ -480,9 +489,26 @@ export default function CreateMatch() {
                 </div>
               )}
 
-{/* Team Selection Logic */}
-              {prefilledTeam1 ? (
-                /* Opponent Team Selection (when team1 is pre-filled) */
+              {/* Team Selection Logic */}
+              {/* Opponent Team: show as locked display if pre-filled, otherwise show dropdown */}
+              {prefilledTeam2 ? (
+                <div>
+                  <Label className="text-base font-medium">Team 2 (Opponent)</Label>
+                  <div className="mt-2 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <div>
+                        <p className="font-medium text-green-700 dark:text-green-300">
+                          {prefilledTeam2.name} (Opponent)
+                        </p>
+                        <p className="text-sm text-green-600 dark:text-green-400">
+                          {prefilledTeam2.city ? `Located in ${prefilledTeam2.city}` : 'No city specified'} • {prefilledTeam2.totalMatches || 0} matches played
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
                 <div>
                   <Label htmlFor="opponent-select" className="text-base font-medium">
                     Choose Opponent (Team 2)
@@ -490,13 +516,13 @@ export default function CreateMatch() {
                   <p className="text-sm text-muted-foreground mb-3">
                     Select the opposing team for this match
                   </p>
-                  <Select 
-                    onValueChange={setSelectedTeam} 
+                  <Select
+                    onValueChange={setSelectedTeam}
                     value={selectedTeam}
                     disabled={teamsLoading}
                   >
-                    <SelectTrigger 
-                      id="opponent-select" 
+                    <SelectTrigger
+                      id="opponent-select"
                       className="w-full"
                       data-testid="select-opponent-team"
                     >
@@ -504,7 +530,7 @@ export default function CreateMatch() {
                     </SelectTrigger>
                     <SelectContent>
                       {allTeams
-                        .filter(team => team.id !== prefilledTeam1.id) // Filter out Team 1 if pre-filled
+                        .filter(team => team.id !== prefilledTeam1?.id)
                         .map((team) => (
                           <SelectItem key={team.id} value={team.id}>
                             <div className="flex items-center justify-between w-full">
@@ -519,7 +545,7 @@ export default function CreateMatch() {
                         ))}
                     </SelectContent>
                   </Select>
-                  
+
                   {selectedTeam && (
                     <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                       {(() => {
@@ -541,8 +567,10 @@ export default function CreateMatch() {
                     </div>
                   )}
                 </div>
-              ) : (
-                /* Both Team Dropdowns (when no teams are pre-filled) */
+              )}
+
+              {/* Both Team Dropdowns (when no teams are pre-filled) */}
+              {!prefilledTeam1 && (
                 <div className="space-y-6">
                   <div>
                     <Label htmlFor="team1-select" className="text-base font-medium">
@@ -551,13 +579,13 @@ export default function CreateMatch() {
                     <p className="text-sm text-muted-foreground mb-3">
                       Choose the first team for this match
                     </p>
-                    <Select 
-                      onValueChange={setSelectedTeam1} 
+                    <Select
+                      onValueChange={setSelectedTeam1}
                       value={selectedTeam1}
                       disabled={teamsLoading}
                     >
-                      <SelectTrigger 
-                        id="team1-select" 
+                      <SelectTrigger
+                        id="team1-select"
                         className="w-full"
                         data-testid="select-team1"
                       >
@@ -580,7 +608,7 @@ export default function CreateMatch() {
                           ))}
                       </SelectContent>
                     </Select>
-                    
+
                     {selectedTeam1 && (
                       <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                         {(() => {
@@ -610,13 +638,13 @@ export default function CreateMatch() {
                     <p className="text-sm text-muted-foreground mb-3">
                       Choose the second team for this match
                     </p>
-                    <Select 
-                      onValueChange={setSelectedTeam2} 
+                    <Select
+                      onValueChange={setSelectedTeam2}
                       value={selectedTeam2}
                       disabled={teamsLoading}
                     >
-                      <SelectTrigger 
-                        id="team2-select" 
+                      <SelectTrigger
+                        id="team2-select"
                         className="w-full"
                         data-testid="select-team2"
                       >
@@ -639,7 +667,7 @@ export default function CreateMatch() {
                           ))}
                       </SelectContent>
                     </Select>
-                    
+
                     {selectedTeam2 && (
                       <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                         {(() => {
@@ -705,7 +733,7 @@ export default function CreateMatch() {
                     </div>
                   </div>
                 )}
-                
+
                 {/* Basic Match Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
@@ -715,8 +743,8 @@ export default function CreateMatch() {
                       <FormItem>
                         <FormLabel>Match Title</FormLabel>
                         <FormControl>
-                          <Input 
-                            {...field} 
+                          <Input
+                            {...field}
                             placeholder="Weekend Cricket Match"
                             data-testid="input-match-title"
                           />
@@ -732,12 +760,12 @@ export default function CreateMatch() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Sport</FormLabel>
-                        <Select 
+                        <Select
                           onValueChange={(value) => {
                             field.onChange(value);
                             setSelectedSport(value);
                             form.setValue("matchType", "");
-                          }} 
+                          }}
                           value={field.value || selectedSport}
                         >
                           <FormControl>
@@ -790,8 +818,8 @@ export default function CreateMatch() {
                       <FormItem>
                         <FormLabel>City</FormLabel>
                         <FormControl>
-                          <Input 
-                            {...field} 
+                          <Input
+                            {...field}
                             placeholder="Mumbai"
                             data-testid="input-city"
                           />
@@ -812,8 +840,8 @@ export default function CreateMatch() {
                       <FormItem>
                         <FormLabel>Date & Time</FormLabel>
                         <FormControl>
-                          <Input 
-                            {...field} 
+                          <Input
+                            {...field}
                             type="datetime-local"
                             data-testid="input-scheduled-at"
                           />
@@ -830,8 +858,8 @@ export default function CreateMatch() {
                       <FormItem>
                         <FormLabel>Duration (minutes)</FormLabel>
                         <FormControl>
-                          <Input 
-                            {...field} 
+                          <Input
+                            {...field}
                             type="number"
                             onChange={(e) => field.onChange(parseInt(e.target.value))}
                             data-testid="input-duration"
@@ -849,8 +877,8 @@ export default function CreateMatch() {
                       <FormItem>
                         <FormLabel>Max Players</FormLabel>
                         <FormControl>
-                          <Input 
-                            {...field} 
+                          <Input
+                            {...field}
                             type="number"
                             onChange={(e) => field.onChange(parseInt(e.target.value))}
                             data-testid="input-max-players"
@@ -886,7 +914,7 @@ export default function CreateMatch() {
                           </div>
                         </div>
                       )}
-                      
+
                       {/* Team 2 Display */}
                       {selectedTeam && (
                         <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
@@ -920,8 +948,8 @@ export default function CreateMatch() {
                         <FormItem>
                           <FormLabel>Team 1 Name (Optional)</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field} 
+                            <Input
+                              {...field}
                               placeholder="Team Warriors"
                               data-testid="input-team1-name"
                             />
@@ -938,8 +966,8 @@ export default function CreateMatch() {
                         <FormItem>
                           <FormLabel>Team 2 Name (Optional)</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field} 
+                            <Input
+                              {...field}
                               placeholder="Team Champions"
                               data-testid="input-team2-name"
                             />
@@ -963,7 +991,7 @@ export default function CreateMatch() {
                         Select players from each team for this match. Each team needs at least 3 players and can have up to 15 players.
                         Available players are loaded from each team's roster.
                       </p>
-                      
+
                       {/* Show loading state while fetching players */}
                       {(team1PlayersLoading || team2PlayersLoading) && (
                         <div className="text-center py-8">
@@ -971,7 +999,7 @@ export default function CreateMatch() {
                           <p>Loading team players...</p>
                         </div>
                       )}
-                      
+
                       {/* Show rosters when players are loaded */}
                       {!team1PlayersLoading && !team2PlayersLoading && (
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -981,7 +1009,7 @@ export default function CreateMatch() {
                             players={team1Roster}
                             onPlayersChange={setTeam1Roster}
                           />
-                          
+
                           <CricketTeamRoster
                             teamName={allTeams.find(t => t.id === selectedTeam)?.name || form.watch("team2Name") || "Team 2"}
                             teamNumber={2}
@@ -1012,7 +1040,7 @@ export default function CreateMatch() {
                       {selectedSport === "cricket" && (team1Roster.length < 3 || team2Roster.length < 3) && (
                         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                           <p className="text-sm text-yellow-800">
-                            ⚠️ Each team needs at least 3 players to start the match. 
+                            ⚠️ Each team needs at least 3 players to start the match.
                             Team 1 has {team1Roster.length} players, Team 2 has {team2Roster.length} players.
                           </p>
                         </div>
@@ -1052,8 +1080,8 @@ export default function CreateMatch() {
                     <FormItem>
                       <FormLabel>Description (Optional)</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          {...field} 
+                        <Textarea
+                          {...field}
                           placeholder="Additional details about the match, skill level requirements, equipment needed, etc."
                           className="min-h-[100px]"
                           data-testid="textarea-description"
@@ -1066,16 +1094,16 @@ export default function CreateMatch() {
 
                 {/* Submit Buttons */}
                 <div className="flex gap-4 pt-6">
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={createMatchMutation.isPending}
                     className="flex-1"
                     data-testid="button-create-match"
                   >
                     {createMatchMutation.isPending ? "Creating..." : "Create Match"}
                   </Button>
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     variant="outline"
                     onClick={() => setLocation('/matches')}
                     data-testid="button-cancel"

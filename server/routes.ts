@@ -56,13 +56,18 @@ function csrfProtection(req: any, res: any, next: any) {
     `http://${host}`,
     `https://${host}`,
     `http://localhost:5000`,
-    `https://localhost:5000`
+    `https://localhost:5000`,
+    `http://localhost:5173`,
+    `https://localhost:5173`,
+    `http://localhost:3000`,
+    `https://localhost:3000`
   ];
 
   const isValidOrigin = origin && allowedOrigins.some(allowed => origin.startsWith(allowed));
   const isValidReferer = referer && allowedOrigins.some(allowed => referer.startsWith(allowed));
 
   if (!isValidOrigin && !isValidReferer) {
+    console.warn(`[CSRF] Blocked: Origin=${origin}, Referer=${referer}, Host=${host}, URL=${req.originalUrl}`);
     return res.status(403).json({ message: 'Invalid origin or referer' });
   }
 
@@ -97,9 +102,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Middleware to make email/password auth compatible with req.user pattern
   // This allows endpoints checking req.user to work with session-based auth
-  app.use((req: any, res, next) => {
-    if (req.session && req.session.user && !req.user) {
+  app.use(async (req: any, res, next) => {
+    if (req.session && req.session.user) {
       req.user = req.session.user;
+
+      // Normalize user ID if it's stored as _id (MongoDB default)
+      if (req.user._id && !req.user.id) {
+        req.user.id = typeof req.user._id === 'object' ? req.user._id.toString() : req.user._id;
+      }
+
+      // 🔍 [SECURITY] Periodically re-verify admin status from database or hardcoded config
+      // to ensure site admin bypasses work even if session is stale
+      if (!req.user.isAdmin || isAdminEmail(req.user.email)) {
+        const isHardcodedAdmin = isAdminEmail(req.user.email);
+        if (isHardcodedAdmin) {
+          req.user.isAdmin = true;
+          req.session.user.isAdmin = true;
+        } else {
+          // Double check database if not already an admin in session
+          try {
+            const dbUser = await storage.getUser(req.user.id);
+            if (dbUser?.isAdmin) {
+              req.user.isAdmin = true;
+              req.session.user.isAdmin = true;
+            }
+          } catch (e) {
+            console.error("[AUTH] Error re-verifying admin status:", e);
+          }
+        }
+      }
     }
     next();
   });
@@ -1155,7 +1186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (storage.deleteUser) {
         const success = await storage.deleteUser(req.params.id);
         if (!success) {
-          return res.status(404).json({ message: "User not found" });
+          return res.status(404).json({ message: "User found?" });
         }
         res.status(204).send();
       } else {
@@ -1164,6 +1195,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting user:", error);
       res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // Get all team admins and co-admins
+  app.get('/api/admin/team-roles', requireAdmin, async (req: any, res) => {
+    try {
+      // 1. Get all players who are admins or co-admins
+      const allPlayers = await storage.getPlayers({});
+      const teamAdmins = allPlayers.filter(p => p.teamRole === "admin" || p.teamRole === "co-admin");
+
+      // 2. Decorate with user and team info
+      const results = await Promise.all(teamAdmins.map(async (player) => {
+        let user = null;
+        if (player.userId) {
+          user = await storage.getUser(player.userId);
+        }
+
+        const team = player.teamId ? await storage.getTeam(player.teamId) : null;
+
+        return {
+          id: player.id,
+          name: player.name,
+          email: player.email,
+          teamRole: player.teamRole,
+          teamId: player.teamId,
+          teamName: team?.name || player.teamName || "Unknown Team",
+          userId: player.userId,
+          userEmail: user?.email,
+          userDisplayName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : null
+        };
+      }));
+
+      res.json(results);
+    } catch (error) {
+      console.error("Error fetching team roles:", error);
+      res.status(500).json({ message: "Failed to fetch team roles" });
     }
   });
 
@@ -1383,13 +1450,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/teams/:id', requireAuth, async (req, res) => {
+  app.put('/api/teams/:id', requireAuth, async (req: any, res) => {
     try {
-      const teamData = insertTeamSchema.partial().parse(req.body);
-      const team = await storage.updateTeam(req.params.id, teamData);
-      if (!team) {
+      const teamId = req.params.id;
+      const user = req.user || req.session.user;
+
+      // Check if team exists
+      const existingTeam = await storage.getTeam(teamId);
+      if (!existingTeam) {
         return res.status(404).json({ message: "Team not found" });
       }
+
+      // Check authorization
+      // 1. Site Admin has access
+      const isSiteAdmin = user?.isAdmin || (user?.email && isAdminEmail?.(user.email));
+
+      if (!isSiteAdmin) {
+        // 2. Check user's role in this team
+        const userProfiles = await storage.getPlayers({ userId: user.id, teamId });
+        const userProfile = userProfiles[0];
+        const isAllowed = userProfile?.teamRole === "admin" || userProfile?.teamRole === "co-admin";
+
+        if (!isAllowed) {
+          return res.status(403).json({
+            message: "You don't have permission to edit this team. Only Team Admin or Co-Admin can do that."
+          });
+        }
+      }
+
+      const teamData = insertTeamSchema.partial().parse(req.body);
+      const team = await storage.updateTeam(teamId, teamData);
       res.json(team);
     } catch (error: any) {
       console.error("Error updating team:", error);
@@ -2513,6 +2603,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Match Request endpoint
+  app.post("/api/match-requests", requireAuth, async (req: any, res) => {
+    try {
+      const { team1Id, team2Id, matchType, message } = req.body;
+      const user = req.user || req.session?.user;
+      const userId = user?.id || (user as any)?._id?.toString();
+
+      console.log(`[ROUTE DEBUG] /api/match-requests attempt by ${user?.email || 'Guest'}. isSiteAdmin: ${user?.isAdmin || false}, team1Id: ${team1Id}, team2Id: ${team2Id}`);
+
+      if (!team1Id || !team2Id) {
+        return res.status(400).json({ message: "Both team1Id and team2Id are required" });
+      }
+
+      // 1. Verify sender is Admin/Co-Admin of team1 or a Site Admin
+      // DEFINITIVE FAIL-SAFE: If email matches ADMIN_EMAIL, it's a site admin.
+      const isSiteAdmin = user?.isAdmin === true || isAdminEmail(user?.email);
+
+      if (!isSiteAdmin) {
+        if (!userId) {
+          return res.status(401).json({ message: "User ID not found in session" });
+        }
+
+        const team1Profiles = await storage.getPlayers({ userId, teamId: team1Id });
+        const senderProfile = team1Profiles[0];
+        const isAllowed = senderProfile?.teamRole === "admin" || senderProfile?.teamRole === "co-admin";
+
+        if (!isAllowed) {
+          console.warn(`[AUTH DENIED] User ${userId} (${user?.email}) blocked from match request for team ${team1Id}`);
+          return res.status(403).json({
+            message: "Only Team Admins or Co-Admins can initiate match requests."
+          });
+        }
+      } else {
+        console.log(`[AUTH BYPASS] Site Admin ${user?.email} initiating match request.`);
+      }
+
+      // 2. Identify Admins/Co-Admins of team2
+      const team2Players = await storage.getPlayers({ teamId: team2Id });
+      const team2Admins = team2Players.filter(p =>
+        (p.teamRole === "admin" || p.teamRole === "co-admin") && p.userId
+      );
+
+      if (team2Admins.length === 0) {
+        return res.status(404).json({
+          message: "Could not find any Admin or Co-Admin for the opponent team to receive the request."
+        });
+      }
+
+      // 3. Send notifications to all team2 admins
+      const senderName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
+      const team1 = await storage.getTeam(team1Id);
+      const team2 = await storage.getTeam(team2Id);
+
+      const notifications = await Promise.all(team2Admins.map(admin =>
+        storage.createNotification({
+          recipientUserId: admin.userId!,
+          senderName: senderName,
+          senderEmail: user.email,
+          senderPhone: user.phoneNumber || "Not provided",
+          type: "match_request",
+          team1Id,
+          team2Id,
+          matchType: matchType || "Friendly",
+          message: message || `${team1?.name || 'A team'} has challenged ${team2?.name || 'your team'} to a ${matchType || 'Friendly'} match!`
+        })
+      ));
+
+      res.status(201).json({
+        message: "Match request sent successfully",
+        notificationCount: notifications.length
+      });
+    } catch (error: any) {
+      console.error("Error creating match request:", error);
+      res.status(500).json({ message: "Failed to send match request" });
+    }
+  });
+
   // Notification routes
   app.post("/api/notifications", async (req, res) => {
     try {
@@ -2638,7 +2805,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Don't fail the main request if sending notification fails
       }
 
-      res.json(updatedNotification);
+      res.json({
+        ...updatedNotification,
+        matchRequestData: notification.type === 'match_request' ? {
+          // Swap: notification.team2Id is the accepter's team (should be Team 1 from their view)
+          //       notification.team1Id is the challenger's team (should be Team 2)
+          team1Id: notification.team2Id || null,
+          team2Id: notification.team1Id || null,
+          matchType: notification.matchType || "Friendly",
+          sport: notification.sport || "cricket"
+        } : null
+      });
     } catch (error) {
       console.error("Error accepting notification:", error);
       res.status(500).json({ message: "Failed to accept notification" });
@@ -2718,12 +2895,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid status" });
       }
 
-      const notification = await storage.updateNotificationStatus(req.params.id, status as any);
-      if (!notification) {
+      const updatedNotification = await storage.updateNotificationStatus(req.params.id, status as any);
+      if (!updatedNotification) {
         return res.status(404).json({ message: "Notification not found" });
       }
 
-      res.json(notification);
+      // If declined and it's a match request, notify the original sender
+      if (status === "declined" && updatedNotification.type === "match_request") {
+        try {
+          const originalNotification = await storage.getNotifications(user.id).then(notifs => notifs.find(n => n.id === req.params.id));
+          // Note: updateNotificationStatus returns the updated notification, but we might need the original senderEmail
+          const senderEmail = updatedNotification.senderEmail;
+          const senderName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
+
+          if (senderEmail) {
+            const senderUser = await storage.getUserByEmail(senderEmail);
+            let recipientUserId: string | undefined;
+            let recipientPlayerId: string | undefined;
+
+            if (senderUser) {
+              recipientUserId = senderUser.id;
+            } else {
+              const senderPlayer = await storage.getPlayerByEmail(senderEmail);
+              if (senderPlayer) {
+                recipientPlayerId = senderPlayer.id;
+              }
+            }
+
+            if (recipientUserId || recipientPlayerId) {
+              await storage.createNotification({
+                recipientUserId,
+                recipientPlayerId,
+                recipientEmail: senderEmail,
+                senderName: senderName,
+                senderEmail: user.email,
+                senderPhone: user.phoneNumber || "Not provided",
+                type: "match_request",
+                message: `${senderName} declined your match request.`,
+              });
+            }
+          }
+        } catch (notifyError) {
+          console.error("Error sending decline notification:", notifyError);
+        }
+      }
+
+      res.json(updatedNotification);
     } catch (error) {
       console.error("Error updating notification:", error);
       res.status(500).json({ message: "Failed to update notification" });

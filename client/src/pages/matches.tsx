@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import Navigation from "@/components/navigation";
 import MatchCard from "@/components/match-card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ import { useEffect } from "react";
 import type { Team } from "@shared/schema";
 
 export default function Matches() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [selectedSport, setSelectedSport] = useState("all");
@@ -25,6 +26,7 @@ export default function Matches() {
   const urlParams = new URLSearchParams(window.location.search);
   const mode = urlParams.get('mode') || 'matches'; // 'matches', 'team-selection', 'opponent-selection'
   const selectedTeamId = urlParams.get('team');
+  const opponentId = urlParams.get('opponent');
 
   // Team search state
   const [teamSearchQuery, setTeamSearchQuery] = useState("");
@@ -140,12 +142,36 @@ export default function Matches() {
   const liveMatches = allMatches.filter((match: any) => match.status === "live");
   const completedMatches = allMatches.filter((match: any) => match.status === "completed");
 
+  // Match request mutation
+  const matchRequestMutation = useMutation({
+    mutationFn: async (data: { team1Id: string; team2Id: string; matchType: string }) => {
+      const response = await apiRequest("POST", "/api/match-requests", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Match Request Sent",
+        description: "A request has been sent to the opponent team's administrators.",
+      });
+      // Navigate back to match history or teams
+      navigate("/matches");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Match Request Failed",
+        description: error.message || "Failed to send match request. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
   // Function to handle team selection for starting a match
   const handleStartMatch = (team: Team) => {
     if (mode === 'team-selection') {
       // Check if user has permission
+      const isSiteAdmin = user?.isAdmin;
       const userProfile = userPlayerProfiles.find((p: any) => p.teamId === team.id);
-      const isAllowed = userProfile?.teamRole === "admin" || userProfile?.teamRole === "co-admin";
+      const isAllowed = isSiteAdmin || userProfile?.teamRole === "admin" || userProfile?.teamRole === "co-admin";
 
       if (!isAllowed) {
         toast({
@@ -157,10 +183,27 @@ export default function Matches() {
       }
 
       // First team selected, now select opponent
-      navigate(`/matches?mode=opponent-selection&team=${team.id}`);
+      if (opponentId) {
+        // We already have an opponent from teams.tsx!
+        // The current 'team' is OUR team (team1), 'opponentId' is team2
+        matchRequestMutation.mutate({
+          team1Id: team.id,
+          team2Id: opponentId,
+          matchType: "Friendly"
+        });
+      } else {
+        navigate(`/matches?mode=opponent-selection&team=${team.id}`);
+      }
     } else if (mode === 'opponent-selection') {
-      // Opponent selected, redirect to create match with pre-filled data
-      navigate(`/create-match?sport=cricket&team1=${selectedTeamId}&team2=${team.id}`);
+      if (!selectedTeamId) return;
+
+      // Opponent selected, send match request
+      // In this mode, selectedTeamId is OUR team (team1), and 'team' is the OPPONENT (team2)
+      matchRequestMutation.mutate({
+        team1Id: selectedTeamId,
+        team2Id: team.id,
+        matchType: "Friendly" // Default to friendly for now
+      });
     }
   };
 
@@ -293,6 +336,7 @@ export default function Matches() {
                   key={team.id}
                   team={team}
                   userProfile={userProfile}
+                  isAdmin={!!user?.isAdmin}
                   onStartMatch={() => handleStartMatch(team)}
                   mode={mode}
                 />
@@ -406,16 +450,17 @@ export default function Matches() {
 interface TeamCardProps {
   team: Team;
   userProfile?: any;
+  isAdmin?: boolean;
   onStartMatch: () => void;
   mode: string;
 }
 
-function TeamCard({ team, userProfile, onStartMatch, mode }: TeamCardProps) {
+function TeamCard({ team, userProfile, isAdmin, onStartMatch, mode }: TeamCardProps) {
   const winPercentage = team.totalMatches
     ? Math.round(((team.matchesWon || 0) / team.totalMatches) * 100)
     : 0;
 
-  const isAllowed = mode === 'opponent-selection' ||
+  const isAllowed = isAdmin || mode === 'opponent-selection' ||
     (userProfile?.teamRole === "admin" || userProfile?.teamRole === "co-admin");
 
   const roleLabels: Record<string, string> = {

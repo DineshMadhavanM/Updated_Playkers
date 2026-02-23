@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import session from "express-session";
+import MemoryStore from "memorystore";
 import type { Express, RequestHandler } from "express";
 import { storage } from "./storage";
 
@@ -20,12 +21,14 @@ export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const isProduction = process.env.NODE_ENV === 'production';
 
-  // Use express-session's built-in MemoryStore for simplicity
-  // In production, consider using a production-grade store like connect-redis
+  // Use memorystore package (supports session.regenerate unlike express-session's built-in MemoryStore)
   console.warn("⚠️  Using memory-based session store");
   console.warn("⚠️  Sessions will not persist between server restarts");
 
-  const sessionStore = new session.MemoryStore();
+  const MemoryStoreSession = MemoryStore(session);
+  const sessionStore = new MemoryStoreSession({
+    checkPeriod: sessionTtl, // prune expired entries every 1 week
+  });
 
   return session({
     secret: process.env.SESSION_SECRET,
@@ -124,7 +127,9 @@ export function requireAuth(req: any, res: any, next: any) {
 
 // Middleware to check if user is admin
 export function requireAdmin(req: any, res: any, next: any) {
-  if (req.session && req.session.user && isAdminEmail(req.session.user.email)) {
+  const isSiteAdmin = req.user?.isAdmin || (req.user?.email && isAdminEmail(req.user.email));
+
+  if (isSiteAdmin) {
     return next();
   }
 

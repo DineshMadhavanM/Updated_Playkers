@@ -1121,6 +1121,8 @@ export const insertInvitationSchema = z.object({
   matchType: z.enum(["Friendly", "League"]).optional(),
   matchId: z.string().optional(),
   teamId: z.string().optional(),
+  inviterTeamId: z.string().optional(),
+  sport: z.string().optional(),
   matchTitle: z.string().optional(),
   teamName: z.string().optional(),
   message: z.string().optional(),
@@ -1155,6 +1157,8 @@ export type Invitation = {
   matchType: "Friendly" | "League" | null;
   matchId: string | null;
   teamId: string | null;
+  inviterTeamId: string | null;
+  sport: string | null;
   matchTitle: string | null;
   teamName: string | null;
   message: string | null;
@@ -1183,7 +1187,10 @@ export const insertNotificationSchema = z.object({
   location: z.string().optional(),
   senderPlace: z.string().optional(),
   preferredTiming: z.string().optional(),
+  team1Id: z.string().optional(),
+  team2Id: z.string().optional(),
   message: z.string().optional(),
+  sport: z.string().optional(),
 });
 
 // Notification type
@@ -1201,7 +1208,10 @@ export type Notification = {
   location: string | null;
   senderPlace: string | null;
   preferredTiming: string | null;
+  team1Id: string | null;
+  team2Id: string | null;
   message: string | null;
+  sport: string | null;
   status: "unread" | "read" | "accepted" | "declined";
   createdAt: Date;
   readAt: Date | null;

@@ -76,6 +76,11 @@ export default function Teams() {
     });
   }
 
+  // Determine if user can start a match (must be admin/co-admin of ANY team)
+  const isGlobalAdminOrCoAdmin = userPlayerProfiles.some(
+    (p: any) => p.teamRole === "admin" || p.teamRole === "co-admin"
+  );
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       {/* Header Section */}
@@ -197,6 +202,7 @@ export default function Teams() {
                 team={team}
                 userProfile={userProfile}
                 isSiteAdmin={!!user?.isAdmin}
+                showStartMatch={isGlobalAdminOrCoAdmin && !userProfile}
               />
             );
           })}
@@ -237,7 +243,17 @@ export default function Teams() {
 }
 
 // Team Card Component
-function TeamCard({ team, userProfile, isSiteAdmin }: { team: Team; userProfile?: any; isSiteAdmin: boolean }) {
+function TeamCard({
+  team,
+  userProfile,
+  isSiteAdmin,
+  showStartMatch
+}: {
+  team: Team;
+  userProfile?: any;
+  isSiteAdmin: boolean;
+  showStartMatch: boolean;
+}) {
   const [, navigate] = useLocation();
 
   const winPercentage = team.totalMatches
@@ -332,19 +348,21 @@ function TeamCard({ team, userProfile, isSiteAdmin }: { team: Team; userProfile?
         </div>
 
         <div className="flex gap-2 w-full">
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate('/matches?mode=opponent-selection&team=' + team.id);
-            }}
-            className="flex-1 flex items-center gap-2"
-            variant="default"
-            size="sm"
-            data-testid={`button-start-match-${team.id}`}
-          >
-            <Play className="h-4 w-4" />
-            Start Match
-          </Button>
+          {showStartMatch && (
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/matches?mode=team-selection&opponent=' + team.id);
+              }}
+              className="flex-1 flex items-center gap-2"
+              variant="default"
+              size="sm"
+              data-testid={`button-start-match-${team.id}`}
+            >
+              <Play className="h-4 w-4" />
+              Start Match
+            </Button>
+          )}
 
           {(isSiteAdmin || userProfile?.teamRole === "admin" || userProfile?.teamRole === "co-admin") && (
             <Button
@@ -354,7 +372,7 @@ function TeamCard({ team, userProfile, isSiteAdmin }: { team: Team; userProfile?
               }}
               variant="outline"
               size="sm"
-              className="flex items-center gap-2"
+              className={`flex items-center gap-2 ${!showStartMatch ? 'w-full' : ''}`}
               data-testid={`button-edit-team-${team.id}`}
             >
               <Edit className="h-4 w-4" />

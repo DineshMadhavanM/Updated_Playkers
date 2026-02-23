@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
+import { useLocation } from "wouter";
 
 interface Notification {
   id: string;
@@ -31,6 +32,7 @@ interface Notification {
 
 export default function NotificationsDropdown() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
 
   const { data: unreadCountData } = useQuery<{ count: number }>({
@@ -77,13 +79,25 @@ export default function NotificationsDropdown() {
       const response = await apiRequest("POST", `/api/notifications/${id}/accept`);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
       toast({
         title: "Request accepted",
         description: "The sender has been notified with your contact details",
       });
+
+      // Handle match request redirection
+      if (data.matchRequestData) {
+        const { team1Id, team2Id, matchType, sport: dataSport } = data.matchRequestData;
+        const sport = dataSport || "cricket";
+        const params = new URLSearchParams();
+        params.set('sport', sport);
+        if (team1Id) params.set('team1', team1Id);
+        if (team2Id) params.set('team2', team2Id);
+        navigate(`/create-match?${params.toString()}`);
+        setIsOpen(false);
+      }
     },
     onError: (error: any) => {
       toast({

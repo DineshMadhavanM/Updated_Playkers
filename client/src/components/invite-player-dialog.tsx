@@ -70,11 +70,15 @@ export default function InvitePlayerDialog({
     matchType: z.enum(["Friendly", "League"]).optional(),
     matchId: z.string().optional(),
     teamId: z.any().optional(),
+    inviterTeamId: z.string().optional(),
+    sport: z.string().optional(),
   });
 
   const teamFields = z.object({
     invitationType: z.literal("team"),
     teamId: z.string().optional(),
+    inviterTeamId: z.string().optional(),
+    sport: z.string().optional(),
     matchType: z.any().optional(),
     matchId: z.any().optional(),
   });
@@ -105,6 +109,8 @@ export default function InvitePlayerDialog({
       matchType: undefined,
       matchId: matchId || undefined,
       teamId: teamId || undefined,
+      inviterTeamId: undefined,
+      sport: undefined,
     } as any,
   });
 
@@ -120,7 +126,7 @@ export default function InvitePlayerDialog({
   // Fetch available teams for selection
   const { data: teams = [] } = useQuery<any[]>({
     queryKey: ["/api/teams"],
-    enabled: isOpen && !teamId && selectedInvitationType === "team",
+    enabled: isOpen && selectedInvitationType === "team",
   });
 
   // Build query URL for invitations
@@ -175,6 +181,8 @@ export default function InvitePlayerDialog({
           payload.teamId = finalTeamId;
           const team = teams.find((t: any) => t.id === finalTeamId);
           payload.teamName = teamName || team?.name;
+          payload.inviterTeamId = data.inviterTeamId;
+          payload.sport = data.sport || team?.sport;
         }
         // Ensure no match data leaks into team invitation
         delete payload.matchId;
@@ -255,6 +263,16 @@ export default function InvitePlayerDialog({
         title: "Invitation accepted!",
         description: `You have successfully joined ${data.targetName || `the ${targetType}`}`,
       });
+
+      // Handle redirect if it's a team challenge
+      if (data.invitationType === "team" && data.inviterTeamId && data.teamId) {
+        const params = new URLSearchParams();
+        params.set('sport', data.sport || 'cricket');
+        if (data.inviterTeamId) params.set('team1', data.inviterTeamId);
+        if (data.teamId) params.set('team2', data.teamId);
+        window.location.href = `/create-match?${params.toString()}`;
+      }
+
       setIsOpen(false);
     },
     onError: (error: any) => {
@@ -405,6 +423,34 @@ export default function InvitePlayerDialog({
                           <SelectContent>
                             {teams.map((team: any) => (
                               <SelectItem key={team.id} value={team.id} data-testid={`option-team-${team.id}`}>
+                                {team.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* INVITER TEAM FIELD (For match challenges) */}
+                {((invitationType === "team" || selectedInvitationType === "team") && teamId) && (
+                  <FormField
+                    control={form.control}
+                    name="inviterTeamId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Your Team (Challenge Initiator)</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-inviter-team">
+                              <SelectValue placeholder="Select your team" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {teams.map((team: any) => (
+                              <SelectItem key={team.id} value={team.id} data-testid={`option-inviter-team-${team.id}`}>
                                 {team.name}
                               </SelectItem>
                             ))}
