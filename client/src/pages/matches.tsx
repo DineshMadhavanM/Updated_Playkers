@@ -31,6 +31,7 @@ export default function Matches() {
   // Team search state
   const [teamSearchQuery, setTeamSearchQuery] = useState("");
   const [citySearchQuery, setCitySearchQuery] = useState("");
+  const [selectionTab, setSelectionTab] = useState("my-teams");
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -239,97 +240,140 @@ export default function Matches() {
   );
 
   // Render team selection interface
-  const renderTeamSelection = () => (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            window.location.href = '/matches';
-          }}
-          className="flex items-center gap-2"
-          data-testid="button-back-to-matches"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Matches
-        </Button>
-        <div>
-          <h2 className="text-2xl font-bold">
-            {mode === 'team-selection' ? 'Select Your Team' : 'Select Opponent Team'}
-          </h2>
-          <p className="text-muted-foreground">
-            {mode === 'team-selection'
-              ? 'Choose your team to start a match'
-              : `Select an opponent for ${selectedTeam?.name || 'your team'}`
-            }
-          </p>
-        </div>
-      </div>
+  const renderTeamSelection = () => {
+    // Filter teams based on the selected tab
+    const filteredTeams = teams.filter(team => {
+      // For team selection mode
+      if (mode === 'team-selection') {
+        const userProfile = userPlayerProfiles.find((p: any) => p.teamId === team.id);
+        const isManaged = user?.isAdmin || userProfile?.teamRole === "admin" || userProfile?.teamRole === "co-admin";
 
-      {/* Search Interface */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search teams by name..."
-            value={teamSearchQuery}
-            onChange={(e) => setTeamSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-teams"
-          />
-        </div>
-        <div className="relative">
-          <Input
-            placeholder="Search by city..."
-            value={citySearchQuery}
-            onChange={(e) => setCitySearchQuery(e.target.value)}
-            className="w-full sm:w-64"
-            data-testid="input-search-city"
-          />
-        </div>
-      </div>
+        if (selectionTab === "my-teams") {
+          return isManaged;
+        }
+      }
 
-      {/* Teams Grid */}
-      {teamsLoading ? (
-        <div className="flex items-center justify-center h-48">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-            <p>Loading teams...</p>
+      // For opponent selection, filter out the selected team
+      if (team.id === selectedTeamId) return false;
+
+      // For opponent selection, only show teams from the same sport
+      if (mode === 'opponent-selection' && selectedTeam) {
+        return team.sport === selectedTeam.sport;
+      }
+
+      return true;
+    });
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              window.location.href = '/matches';
+            }}
+            className="flex items-center gap-2"
+            data-testid="button-back-to-matches"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Matches
+          </Button>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold">
+              {mode === 'team-selection' ? 'Select Your Team' : 'Select Opponent Team'}
+            </h2>
+            <p className="text-muted-foreground">
+              {mode === 'team-selection'
+                ? 'Choose a team you manage to initiate a match invitation'
+                : `Select an opponent for ${selectedTeam?.name || 'your team'}`
+              }
+            </p>
+          </div>
+
+          <Link href="/create-match">
+            <Button variant="outline" size="sm" className="hidden sm:flex items-center gap-2 border-primary/50 text-primary hover:bg-primary/5">
+              <Plus className="h-4 w-4" />
+              Manual Match Entry
+            </Button>
+          </Link>
+        </div>
+
+        {/* Manual entry shortcut for mobile */}
+        <div className="sm:hidden">
+          <Link href="/create-match">
+            <Button variant="outline" size="sm" className="w-full flex items-center justify-center gap-2 border-primary/50 text-primary">
+              <Plus className="h-4 w-4" />
+              Manual Match Entry
+            </Button>
+          </Link>
+        </div>
+
+        {/* Tabs for team selection mode */}
+        {mode === 'team-selection' && (
+          <Tabs defaultValue="my-teams" value={selectionTab} onValueChange={setSelectionTab} className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2 mb-2">
+              <TabsTrigger value="my-teams">My Teams</TabsTrigger>
+              <TabsTrigger value="all-teams">All Teams</TabsTrigger>
+            </TabsList>
+            <p className="text-xs text-muted-foreground px-1 pb-4">
+              {selectionTab === "my-teams"
+                ? "Showing teams where you are an Admin or Co-Admin."
+                : "Showing all registered teams on Playkers."}
+            </p>
+          </Tabs>
+        )}
+
+        {/* Search Interface */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search teams by name..."
+              value={teamSearchQuery}
+              onChange={(e) => setTeamSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-teams"
+            />
+          </div>
+          <div className="relative">
+            <Input
+              placeholder="Search by city..."
+              value={citySearchQuery}
+              onChange={(e) => setCitySearchQuery(e.target.value)}
+              className="w-full sm:w-64"
+              data-testid="input-search-city"
+            />
           </div>
         </div>
-      ) : teams.length === 0 ? (
-        <div className="text-center py-12">
-          <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">
-            {teamSearchQuery || citySearchQuery ? 'No teams found' : 'No teams available'}
-          </h3>
-          <p className="text-gray-600 dark:text-gray-300">
-            {teamSearchQuery || citySearchQuery
-              ? 'Try adjusting your search terms'
-              : 'Create teams first to start matches'
-            }
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {teams
-            .filter(team => {
-              // For team selection, show all teams
-              if (mode === 'team-selection') return true;
 
-              // For opponent selection, filter out the selected team
-              if (team.id === selectedTeamId) return false;
-
-              // For opponent selection, only show teams from the same sport
-              if (mode === 'opponent-selection' && selectedTeam) {
-                return team.sport === selectedTeam.sport;
+        {/* Teams Grid */}
+        {teamsLoading ? (
+          <div className="flex items-center justify-center h-48">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+              <p>Loading teams...</p>
+            </div>
+          </div>
+        ) : filteredTeams.length === 0 ? (
+          <div className="text-center py-12">
+            <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">
+              {teamSearchQuery || citySearchQuery ? 'No teams found' : 'No teams available'}
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300">
+              {teamSearchQuery || citySearchQuery
+                ? 'Try adjusting your search terms'
+                : selectionTab === "my-teams"
+                  ? "You don't have any teams to manage. Switch to 'All Teams' to see others."
+                  : 'Create teams first to start matches'
               }
-
-              return true;
-            })
-            .map((team) => {
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredTeams.map((team) => {
               const userProfile = userPlayerProfiles.find((p: any) => p.teamId === team.id);
               return (
                 <TeamCard
@@ -342,10 +386,11 @@ export default function Matches() {
                 />
               );
             })}
-        </div>
-      )}
-    </div>
-  );
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background" data-testid="matches-page">
@@ -470,7 +515,12 @@ function TeamCard({ team, userProfile, isAdmin, onStartMatch, mode }: TeamCardPr
   };
 
   return (
-    <Card className={`hover:shadow-lg transition-shadow relative ${!isAllowed ? 'opacity-75 grayscale-[0.5]' : ''}`}>
+    <Card className={`hover:shadow-lg transition-shadow relative ${!isAllowed && mode === 'team-selection' ? 'opacity-75 grayscale-[0.5]' : ''}`}>
+      {!isAllowed && mode === 'team-selection' && (
+        <Badge variant="destructive" className="absolute top-2 right-2 text-[10px]">
+          Locked
+        </Badge>
+      )}
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -541,8 +591,8 @@ function TeamCard({ team, userProfile, isAdmin, onStartMatch, mode }: TeamCardPr
 
       <CardFooter className="flex flex-col gap-2">
         {!isAllowed && mode === 'team-selection' && (
-          <p className="text-[10px] text-red-500 font-medium text-center w-full">
-            Admin/Co-Admin permission required to select this team
+          <p className="text-[10px] text-red-500 font-medium text-center w-full bg-red-50 dark:bg-red-900/10 py-1 rounded">
+            Admin/Co-Admin permission required to select
           </p>
         )}
         <Button

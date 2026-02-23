@@ -213,9 +213,10 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
     const battingTeam = currentInning === 1 ? 'team1' : 'team2';
 
     // Filter actual roster players by batting team and exclude dismissed players
-    const filteredPlayers = rosterPlayers.filter((player: any) =>
-      player.team === battingTeam && !dismissedPlayers.has(player.name || player.playerName)
-    );
+    const filteredPlayers = rosterPlayers.filter((player: any) => {
+      const playerName = (player.name || player.playerName)?.trim();
+      return player.team === battingTeam && playerName && !dismissedPlayers.has(playerName);
+    });
 
     // If we have roster data with available players, return them
     if (filteredPlayers.length > 0) {
@@ -238,7 +239,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
       { name: `${teamName} Batsman 11`, team: battingTeam, role: 'batsman', id: `${battingTeam}-batsman-11` },
     ];
     // Filter out dismissed players from fallback names too
-    return fallbackBatsmen.filter(player => !dismissedPlayers.has(player.name));
+    return fallbackBatsmen.filter(player => !dismissedPlayers.has(player.name?.trim()));
   };
 
   // Track legal balls separately from total balls (including extras)
@@ -274,25 +275,25 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
   };
 
   const isPreviousOverBowler = (playerName: string) => {
-    return playerName === lastOverBowlerByInning[currentInning];
+    return playerName?.trim() === lastOverBowlerByInning[currentInning]?.trim();
   };
 
   const computeEligibleBowlers = (excludeBowler?: string) => {
     const fieldingRoster = getFieldingRoster();
-    const bowlerToExclude = excludeBowler || lastOverBowlerByInning[currentInning];
+    const bowlerToExclude = (excludeBowler || lastOverBowlerByInning[currentInning])?.trim();
     return fieldingRoster
       .filter((player: any) => {
-        const playerName = player.name || player.playerName;
+        const playerName = (player.name || player.playerName)?.trim();
         const isNotPreviousBowler = playerName !== bowlerToExclude;
         // Bowling quota constraint removed - only check consecutive overs rule
         return isNotPreviousBowler && playerName; // Ensure player has a valid name
       })
-      .map((player: any) => player.name || player.playerName);
+      .map((player: any) => (player.name || player.playerName)?.trim());
   };
 
   const getBowlerRestrictionReason = (playerName: string, excludeBowler?: string) => {
-    const bowlerToExclude = excludeBowler || lastOverBowlerByInning[currentInning];
-    if (playerName === bowlerToExclude) {
+    const bowlerToExclude = (excludeBowler || lastOverBowlerByInning[currentInning])?.trim();
+    if (playerName?.trim() === bowlerToExclude) {
       return "Cannot bowl consecutive overs";
     }
     // Bowling quota constraint removed - no quota restrictions
@@ -329,8 +330,11 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
 
   // Update player statistics
   const updateBattingStats = (playerName: string, runs: number, countsAsBall: boolean = true, isDot: boolean = false, dismissalType?: string) => {
+    const pName = playerName?.trim();
+    if (!pName) return;
+
     setBattingStats(prev => {
-      const existingPlayerIndex = prev.findIndex(p => p.name === playerName);
+      const existingPlayerIndex = prev.findIndex(p => p.name?.trim() === pName);
       if (existingPlayerIndex >= 0) {
         const updated = [...prev];
         const player = updated[existingPlayerIndex];
@@ -347,7 +351,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
         return updated;
       } else {
         const newPlayer: PlayerBattingStats = {
-          name: playerName,
+          name: pName,
           runs,
           balls: countsAsBall ? 1 : 0,
           dots: isDot ? 1 : 0,
@@ -362,8 +366,11 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
   };
 
   const updateBowlingStats = (playerName: string, runs: number, isWicket: boolean = false, countsAsBall: boolean = true) => {
+    const pName = playerName?.trim();
+    if (!pName) return;
+
     setBowlingStats(prev => {
-      const existingPlayerIndex = prev.findIndex(p => p.name === playerName);
+      const existingPlayerIndex = prev.findIndex(p => p.name?.trim() === pName);
       if (existingPlayerIndex >= 0) {
         const updated = [...prev];
         const player = updated[existingPlayerIndex];
@@ -385,7 +392,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
         return updated;
       } else {
         const newPlayer: PlayerBowlingStats = {
-          name: playerName,
+          name: pName,
           wickets: isWicket ? 1 : 0,
           overs: countsAsBall ? 0.1 : 0,
           balls: countsAsBall ? 1 : 0,
@@ -404,9 +411,9 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
       ...prev,
       [currentInning]: {
         ...prev[currentInning],
-        [playerName]: {
-          legalBalls: (prev[currentInning]?.[playerName]?.legalBalls || 0) + (countsAsBall ? 1 : 0),
-          totalBalls: (prev[currentInning]?.[playerName]?.totalBalls || 0) + 1
+        [pName]: {
+          legalBalls: (prev[currentInning]?.[pName]?.legalBalls || 0) + (countsAsBall ? 1 : 0),
+          totalBalls: (prev[currentInning]?.[pName]?.totalBalls || 0) + 1
         }
       }
     }));
@@ -421,7 +428,8 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
 
   // Handle batsman replacement
   const handleBatsmanReplacement = () => {
-    if (!selectedReplacement) {
+    const sReplacement = selectedReplacement?.trim();
+    if (!sReplacement) {
       toast({
         title: "Replacement Required",
         description: "Please select a replacement batsman.",
@@ -433,7 +441,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
     // Validate replacement is from batting team
     const battingRoster = getBattingRoster();
     const replacementInRoster = battingRoster.some((player: any) =>
-      (player.name || player.playerName) === selectedReplacement
+      (player.name || player.playerName)?.trim() === sReplacement
     );
 
     if (!replacementInRoster) {
@@ -446,7 +454,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
     }
 
     // Validate replacement is not already playing
-    if (selectedReplacement === currentStriker || selectedReplacement === currentNonStriker) {
+    if (sReplacement === currentStriker?.trim() || sReplacement === currentNonStriker?.trim()) {
       toast({
         title: "Invalid Selection",
         description: "Selected batsman is already playing. Choose a different player.",
@@ -456,7 +464,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
     }
 
     // Validate replacement is not already dismissed
-    if (dismissedPlayers.has(selectedReplacement)) {
+    if (dismissedPlayers.has(sReplacement)) {
       toast({
         title: "Invalid Selection",
         description: "Selected batsman is already out. Choose an active player.",
@@ -969,7 +977,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
     const actualDismissedBatter = ['run-out', 'wide-wicket', 'no-ball-wicket', 'leg-bye-wicket', 'bye-wicket'].includes(wicketType)
       ? (dismissedBatter || 'striker')
       : 'striker';
-    const dismissedBatterName = actualDismissedBatter === 'striker' ? currentStriker : currentNonStriker;
+    const dismissedBatterName = (actualDismissedBatter === 'striker' ? currentStriker : currentNonStriker)?.trim();
 
     // Mark player as dismissed and handle ball attribution correctly
     if (dismissedBatterName) {
@@ -1031,33 +1039,35 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
     const nonStrikerBeforeWicket = currentNonStriker;
 
     // Update batsmen based on who was dismissed
-    if (nextBatsmanName) {
+    if (nextBatsmanName?.trim()) {
+      const nBatsmanName = nextBatsmanName.trim();
       // Initialize batting stats for new batsman
-      updateBattingStats(nextBatsmanName, 0, false, false);
+      updateBattingStats(nBatsmanName, 0, false, false);
 
       // Special handling for run-out and combo wickets with custom batting positions
-      if (['run-out', 'wide-wicket', 'no-ball-wicket', 'leg-bye-wicket', 'bye-wicket'].includes(wicketType) && newStrikerAfterRunOut) {
+      if (['run-out', 'wide-wicket', 'no-ball-wicket', 'leg-bye-wicket', 'bye-wicket'].includes(wicketType) && newStrikerAfterRunOut?.trim()) {
+        const nStrikerAfterRunOut = newStrikerAfterRunOut.trim();
         // Determine the surviving batsman
-        const survivingBatsman = actualDismissedBatter === 'striker' ? currentNonStriker : currentStriker;
+        const survivingBatsman = (actualDismissedBatter === 'striker' ? currentNonStriker : currentStriker)?.trim();
 
         // Set positions based on user selection
-        if (newStrikerAfterRunOut === nextBatsmanName) {
+        if (nStrikerAfterRunOut === nBatsmanName) {
           // New batsman is striker, surviving batsman is non-striker
-          setCurrentStriker(nextBatsmanName);
+          setCurrentStriker(nBatsmanName);
           setCurrentNonStriker(survivingBatsman);
         } else {
           // Surviving batsman is striker, new batsman is non-striker
           setCurrentStriker(survivingBatsman);
-          setCurrentNonStriker(nextBatsmanName);
+          setCurrentNonStriker(nBatsmanName);
         }
       } else {
         // Standard wicket logic
         if (actualDismissedBatter === 'striker') {
           // Striker gets out: new batsman replaces striker position
-          setCurrentStriker(nextBatsmanName);
+          setCurrentStriker(nBatsmanName);
         } else {
           // Non-striker gets out: new batsman replaces non-striker position
-          setCurrentNonStriker(nextBatsmanName);
+          setCurrentNonStriker(nBatsmanName);
         }
       }
     }
@@ -1623,14 +1633,18 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
     setFirstInningsComplete(false);
     setShowManualSecondInningsButton(false);
 
-    // Set new players
-    setCurrentStriker(newStriker);
-    setCurrentNonStriker(newNonStriker);
-    setCurrentBowler(newBowler);
+    // Set new players with trimmed names
+    const sName = newStriker?.trim();
+    const nsName = newNonStriker?.trim();
+    const bName = newBowler?.trim();
+
+    setCurrentStriker(sName);
+    setCurrentNonStriker(nsName);
+    setCurrentBowler(bName);
 
     // Initialize batting stats for new batsmen
-    if (newStriker) updateBattingStats(newStriker, 0, false, false);
-    if (newNonStriker) updateBattingStats(newNonStriker, 0, false, false);
+    if (sName) updateBattingStats(sName, 0, false, false);
+    if (nsName) updateBattingStats(nsName, 0, false, false);
 
     // Team 2 balls start from 0
     setTeam2Balls(0);
@@ -3374,7 +3388,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                     // Validate next batsman is from batting team
                     const battingRoster = getBattingRoster();
                     const batsmanInRoster = battingRoster.some((player: any) =>
-                      (player.name || player.playerName) === nextBatsman.trim()
+                      (player.name || player.playerName)?.trim() === nextBatsman.trim()
                     );
 
                     if (!batsmanInRoster) {
@@ -3387,7 +3401,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                     }
 
                     // Validate next batsman is not currently playing
-                    if (nextBatsman.trim() === currentStriker || nextBatsman.trim() === currentNonStriker) {
+                    if (nextBatsman.trim() === currentStriker?.trim() || nextBatsman.trim() === currentNonStriker?.trim()) {
                       toast({
                         title: "Invalid Selection",
                         description: "Selected batsman is already playing. Choose a different player.",
@@ -3671,8 +3685,8 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                 </SelectContent>
               </Select>
               {getBattingRoster().filter((player: any) => {
-                const playerName = player.name || player.playerName;
-                return !dismissedPlayers.has(playerName) && playerName !== currentStriker && playerName !== currentNonStriker;
+                const playerName = (player.name || player.playerName)?.trim();
+                return playerName && !dismissedPlayers.has(playerName) && playerName !== currentStriker?.trim() && playerName !== currentNonStriker?.trim();
               }).length === 0 && (
                   <p className="text-xs text-red-600 dark:text-red-400">
                     ⚠️ No available batsmen! All remaining players are either already playing or dismissed.
@@ -3868,10 +3882,10 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                   // Validate batsmen are from batting team (team2 in second innings)
                   const battingRoster = getBattingRoster();
                   const strikerInRoster = battingRoster.some((player: any) =>
-                    (player.name || player.playerName) === newStriker.trim()
+                    (player.name || player.playerName)?.trim() === newStriker.trim()
                   );
                   const nonStrikerInRoster = battingRoster.some((player: any) =>
-                    (player.name || player.playerName) === newNonStriker.trim()
+                    (player.name || player.playerName)?.trim() === newNonStriker.trim()
                   );
 
                   if (!strikerInRoster || !nonStrikerInRoster) {
@@ -3886,7 +3900,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                   // Validate bowler is from fielding team (team1 in second innings)
                   const fieldingRoster = getFieldingRoster();
                   const bowlerInRoster = fieldingRoster.some((player: any) =>
-                    (player.name || player.playerName) === newBowler.trim()
+                    (player.name || player.playerName)?.trim() === newBowler.trim()
                   );
 
                   if (!bowlerInRoster) {
@@ -3951,10 +3965,10 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                   </SelectTrigger>
                   <SelectContent>
                     {getAllPlayers().map((player: any, index: number) => {
-                      const playerName = player.name || player.playerName;
+                      const playerName = (player.name || player.playerName)?.trim();
                       const teamName = player.team === 'team1' ? (match.team1Name || 'Team A') : (match.team2Name || 'Team B');
                       return (
-                        <SelectItem key={player.id || `motm-${index}`} value={playerName}>
+                        <SelectItem key={player.id || `motm-${index}`} value={playerName || `player-${index}`}>
                           {playerName}
                           <span className="ml-2 text-xs text-muted-foreground">({teamName})</span>
                           {player.role && player.role !== 'player' && (

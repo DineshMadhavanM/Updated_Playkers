@@ -211,8 +211,8 @@ export default function MatchScorer() {
 
     // Validate batsmen are from batting team
     const battingPlayers = rosterPlayers.filter(p => p.team === battingTeam);
-    const strikerInTeam = battingPlayers.some(p => p.name === striker);
-    const nonStrikerInTeam = battingPlayers.some(p => p.name === nonStriker);
+    const strikerInTeam = battingPlayers.some(p => (p.name || p.playerName)?.trim() === striker.trim());
+    const nonStrikerInTeam = battingPlayers.some(p => (p.name || p.playerName)?.trim() === nonStriker.trim());
 
     if (!strikerInTeam || !nonStrikerInTeam) {
       toast({
@@ -225,7 +225,7 @@ export default function MatchScorer() {
 
     // Validate bowler is from bowling team
     const bowlingPlayers = rosterPlayers.filter(p => p.team === bowlingTeam);
-    const bowlerInTeam = bowlingPlayers.some(p => p.name === bowler);
+    const bowlerInTeam = bowlingPlayers.some(p => (p.name || p.playerName)?.trim() === bowler.trim());
 
     if (!bowlerInTeam) {
       toast({
