@@ -10,7 +10,7 @@ import KabaddiScorer from "@/components/scoring/kabaddi-scorer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
@@ -123,14 +123,14 @@ export default function MatchScorer() {
       setShowTossDialog(true);
       return;
     }
-    
+
     // For non-cricket matches, start immediately
     startMatchAfterToss();
   };
 
   const startMatchAfterToss = () => {
     const matchData: any = { status: 'live' };
-    
+
     // Include toss and player information for cricket matches
     if (match?.sport === 'cricket' && tossWinner && tossDecision) {
       matchData.matchData = {
@@ -147,16 +147,16 @@ export default function MatchScorer() {
         }
       };
     }
-    
+
     updateMatchMutation.mutate(matchData);
     setMatchStatus('live');
     setShowTossDialog(false);
     setShowPlayerSelectionDialog(false);
-    
-    const description = match?.sport === 'cricket' 
+
+    const description = match?.sport === 'cricket'
       ? `${tossWinner} won the toss and chose to ${tossDecision} first. ${striker} and ${nonStriker} are opening the batting, ${bowler} will bowl first. Match is now live!`
       : "The match is now live!";
-    
+
     toast({
       title: "Match Started",
       description: description,
@@ -172,7 +172,7 @@ export default function MatchScorer() {
       });
       return;
     }
-    
+
     // After toss, show player selection dialog
     setShowTossDialog(false);
     setShowPlayerSelectionDialog(true);
@@ -196,11 +196,11 @@ export default function MatchScorer() {
       });
       return;
     }
-    
+
     // Determine team assignments based on toss
     const tossWinnerIsTeam1 = tossWinner === (match?.team1Name || "Team 1");
     let battingTeam, bowlingTeam;
-    
+
     if (tossDecision === 'bat') {
       battingTeam = tossWinnerIsTeam1 ? 'team1' : 'team2';
       bowlingTeam = tossWinnerIsTeam1 ? 'team2' : 'team1';
@@ -208,12 +208,12 @@ export default function MatchScorer() {
       battingTeam = tossWinnerIsTeam1 ? 'team2' : 'team1';
       bowlingTeam = tossWinnerIsTeam1 ? 'team1' : 'team2';
     }
-    
+
     // Validate batsmen are from batting team
     const battingPlayers = rosterPlayers.filter(p => p.team === battingTeam);
     const strikerInTeam = battingPlayers.some(p => p.name === striker);
     const nonStrikerInTeam = battingPlayers.some(p => p.name === nonStriker);
-    
+
     if (!strikerInTeam || !nonStrikerInTeam) {
       toast({
         title: "Invalid Team Selection",
@@ -222,11 +222,11 @@ export default function MatchScorer() {
       });
       return;
     }
-    
+
     // Validate bowler is from bowling team
     const bowlingPlayers = rosterPlayers.filter(p => p.team === bowlingTeam);
     const bowlerInTeam = bowlingPlayers.some(p => p.name === bowler);
-    
+
     if (!bowlerInTeam) {
       toast({
         title: "Invalid Team Selection",
@@ -235,7 +235,7 @@ export default function MatchScorer() {
       });
       return;
     }
-    
+
     startMatchAfterToss();
   };
 
@@ -310,7 +310,7 @@ export default function MatchScorer() {
         // Determine winner based on scores
         const team1Runs = (match?.team1Score as any)?.runs || 0;
         const team2Runs = (match?.team2Score as any)?.runs || 0;
-        
+
         if (team1Runs > team2Runs) {
           completionData.resultSummary.winnerId = (match?.matchData as any)?.team1Id;
           completionData.resultSummary.resultType = 'won-by-runs';
@@ -326,7 +326,7 @@ export default function MatchScorer() {
 
         // Call the completion endpoint which will update player and team statistics
         await apiRequest("POST", `/api/matches/${params?.id}/complete`, completionData);
-        
+
         toast({
           title: "Match Completed",
           description: "The match has been completed and player statistics have been updated!",
@@ -339,23 +339,23 @@ export default function MatchScorer() {
           description: "The match has been completed!",
         });
       }
-      
+
       setMatchStatus('completed');
-      
+
       // Invalidate queries to refresh data including player statistics
       queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/players"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
-      
+
       // Invalidate user-specific stats and matches
       queryClient.invalidateQueries({ queryKey: ["/api/user/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/matches"] });
-      
+
       // Invalidate specific match-related queries
       queryClient.invalidateQueries({ queryKey: ["/api/matches", params?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/matches", params?.id, "participants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/matches", params?.id, "roster"] });
-      
+
       // Invalidate team-specific caches for both teams
       const team1Id = (match?.matchData as any)?.team1Id;
       const team2Id = (match?.matchData as any)?.team2Id;
@@ -367,7 +367,7 @@ export default function MatchScorer() {
         queryClient.invalidateQueries({ queryKey: ["/api/teams", team2Id] });
         queryClient.invalidateQueries({ queryKey: ["/api/teams", team2Id, "matches"] });
       }
-      
+
       // Invalidate player-specific caches for all participants
       if (participants.length > 0) {
         participants.forEach((participant: any) => {
@@ -377,7 +377,7 @@ export default function MatchScorer() {
           }
         });
       }
-      
+
     } catch (error) {
       console.error("Error completing match:", error);
       toast({
@@ -463,7 +463,7 @@ export default function MatchScorer() {
   return (
     <div className="min-h-screen bg-background" data-testid="match-scorer-page">
       <Navigation />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Match Header */}
         <Card className="mb-8">
@@ -488,7 +488,7 @@ export default function MatchScorer() {
                   </div>
                 </div>
               </div>
-              <Badge 
+              <Badge
                 variant={matchStatus === 'live' ? 'default' : 'secondary'}
                 className="text-lg px-4 py-2"
                 data-testid="badge-match-status"
@@ -537,10 +537,10 @@ export default function MatchScorer() {
                 </div>
               </div>
             )}
-            
+
             <div className="flex gap-4">
               {matchStatus === 'upcoming' && (
-                <Button 
+                <Button
                   onClick={handleStartMatch}
                   disabled={updateMatchMutation.isPending}
                   data-testid="button-start-match"
@@ -551,7 +551,7 @@ export default function MatchScorer() {
               )}
               {matchStatus === 'live' && (
                 <>
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={handlePauseMatch}
                     disabled={updateMatchMutation.isPending}
@@ -560,7 +560,7 @@ export default function MatchScorer() {
                     <Pause className="h-4 w-4 mr-2" />
                     Pause
                   </Button>
-                  <Button 
+                  <Button
                     variant="destructive"
                     onClick={handleEndMatch}
                     disabled={updateMatchMutation.isPending}
@@ -587,6 +587,9 @@ export default function MatchScorer() {
             <DialogTitle className="flex items-center gap-2">
               🏏 Cricket Toss
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Select the team that won the toss and their decision to bat or bowl first.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
             <div className="space-y-2">
@@ -620,8 +623,8 @@ export default function MatchScorer() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setShowTossDialog(false);
                   setTossWinner('');
@@ -632,7 +635,7 @@ export default function MatchScorer() {
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleTossSubmit}
                 disabled={!tossWinner || !tossDecision || updateMatchMutation.isPending}
                 className="flex-1"
@@ -652,13 +655,16 @@ export default function MatchScorer() {
             <DialogTitle className="flex items-center gap-2">
               👥 Select Opening Players
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Choose the striker, non-striker, and opening bowler for the match.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
             {(() => {
               // Determine batting and bowling teams based on toss
               const tossWinnerIsTeam1 = tossWinner === (match?.team1Name || "Team 1");
               let battingTeam, bowlingTeam, battingTeamName, bowlingTeamName;
-              
+
               if (tossDecision === 'bat') {
                 // Toss winner chose to bat
                 battingTeam = tossWinnerIsTeam1 ? 'team1' : 'team2';
@@ -675,7 +681,7 @@ export default function MatchScorer() {
 
               const battingPlayers = rosterPlayers.filter(p => p.team === battingTeam);
               const bowlingPlayers = rosterPlayers.filter(p => p.team === bowlingTeam);
-              
+
 
               return (
                 <>
@@ -683,7 +689,7 @@ export default function MatchScorer() {
                     <h4 className="font-medium text-sm text-muted-foreground">
                       🏏 {battingTeamName} - Opening Batsmen
                     </h4>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="striker">Striker</Label>
                       <Select value={striker} onValueChange={setStriker}>
@@ -721,7 +727,7 @@ export default function MatchScorer() {
                     <h4 className="font-medium text-sm text-muted-foreground">
                       ⚾ {bowlingTeamName} - Opening Bowler
                     </h4>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="bowler">Opening Bowler</Label>
                       <Select value={bowler} onValueChange={setBowler}>
@@ -743,8 +749,8 @@ export default function MatchScorer() {
             })()}
 
             <div className="flex gap-3 pt-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setShowPlayerSelectionDialog(false);
                   setShowTossDialog(true);
@@ -757,7 +763,7 @@ export default function MatchScorer() {
               >
                 Back to Toss
               </Button>
-              <Button 
+              <Button
                 onClick={handlePlayerSelectionSubmit}
                 disabled={!striker || !nonStriker || !bowler || updateMatchMutation.isPending}
                 className="flex-1"

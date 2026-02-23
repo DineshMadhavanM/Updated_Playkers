@@ -20,12 +20,12 @@ export default function Matches() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [selectedSport, setSelectedSport] = useState("all");
-  
+
   // URL parameters for different modes
   const urlParams = new URLSearchParams(window.location.search);
   const mode = urlParams.get('mode') || 'matches'; // 'matches', 'team-selection', 'opponent-selection'
   const selectedTeamId = urlParams.get('team');
-  
+
   // Team search state
   const [teamSearchQuery, setTeamSearchQuery] = useState("");
   const [citySearchQuery, setCitySearchQuery] = useState("");
@@ -50,12 +50,13 @@ export default function Matches() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedSport && selectedSport !== "all") params.set("sport", selectedSport);
-      
+
       const response = await fetch(`/api/matches?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch matches");
       return response.json();
     },
     enabled: isAuthenticated,
+    retry: false,
   });
 
   const { data: userMatches = [] } = useQuery({
@@ -66,6 +67,7 @@ export default function Matches() {
       return response.json();
     },
     enabled: isAuthenticated,
+    retry: false,
   });
 
   // Teams query for team selection mode
@@ -86,6 +88,7 @@ export default function Matches() {
       return response.json();
     },
     enabled: isAuthenticated && (mode === 'team-selection' || mode === 'opponent-selection'),
+    retry: false,
   });
 
   // Get selected team details for opponent selection mode
@@ -97,6 +100,20 @@ export default function Matches() {
       return response.json();
     },
     enabled: isAuthenticated && mode === 'opponent-selection' && !!selectedTeamId,
+    retry: false,
+  });
+
+  // Get current user's player profiles across all teams to check roles
+  const { data: userPlayerProfiles = [] } = useQuery({
+    queryKey: ["/api/user/players"],
+    queryFn: async () => {
+      const response = await fetch("/api/user/players");
+      if (!response.ok) throw new Error("Failed to fetch player profiles");
+      return response.json();
+    },
+    enabled: isAuthenticated,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 
   if (isLoading) {
@@ -118,7 +135,7 @@ export default function Matches() {
   }
 
   const sports = ["cricket", "football", "volleyball", "tennis", "kabaddi"];
-  
+
   const upcomingMatches = allMatches.filter((match: any) => match.status === "upcoming");
   const liveMatches = allMatches.filter((match: any) => match.status === "live");
   const completedMatches = allMatches.filter((match: any) => match.status === "completed");
@@ -126,6 +143,19 @@ export default function Matches() {
   // Function to handle team selection for starting a match
   const handleStartMatch = (team: Team) => {
     if (mode === 'team-selection') {
+      // Check if user has permission
+      const userProfile = userPlayerProfiles.find((p: any) => p.teamId === team.id);
+      const isAllowed = userProfile?.teamRole === "admin" || userProfile?.teamRole === "co-admin";
+
+      if (!isAllowed) {
+        toast({
+          title: "Permission Denied",
+          description: "Only Team Admin or Co-Admin can start a match for this team.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // First team selected, now select opponent
       navigate(`/matches?mode=opponent-selection&team=${team.id}`);
     } else if (mode === 'opponent-selection') {
@@ -187,7 +217,7 @@ export default function Matches() {
             {mode === 'team-selection' ? 'Select Your Team' : 'Select Opponent Team'}
           </h2>
           <p className="text-muted-foreground">
-            {mode === 'team-selection' 
+            {mode === 'team-selection'
               ? 'Choose your team to start a match'
               : `Select an opponent for ${selectedTeam?.name || 'your team'}`
             }
@@ -233,7 +263,7 @@ export default function Matches() {
             {teamSearchQuery || citySearchQuery ? 'No teams found' : 'No teams available'}
           </h3>
           <p className="text-gray-600 dark:text-gray-300">
-            {teamSearchQuery || citySearchQuery 
+            {teamSearchQuery || citySearchQuery
               ? 'Try adjusting your search terms'
               : 'Create teams first to start matches'
             }
@@ -245,25 +275,29 @@ export default function Matches() {
             .filter(team => {
               // For team selection, show all teams
               if (mode === 'team-selection') return true;
-              
+
               // For opponent selection, filter out the selected team
               if (team.id === selectedTeamId) return false;
-              
+
               // For opponent selection, only show teams from the same sport
               if (mode === 'opponent-selection' && selectedTeam) {
                 return team.sport === selectedTeam.sport;
               }
-              
+
               return true;
             })
-            .map((team) => (
-              <TeamCard 
-                key={team.id} 
-                team={team} 
-                onStartMatch={() => handleStartMatch(team)}
-                mode={mode}
-              />
-            ))}
+            .map((team) => {
+              const userProfile = userPlayerProfiles.find((p: any) => p.teamId === team.id);
+              return (
+                <TeamCard
+                  key={team.id}
+                  team={team}
+                  userProfile={userProfile}
+                  onStartMatch={() => handleStartMatch(team)}
+                  mode={mode}
+                />
+              );
+            })}
         </div>
       )}
     </div>
@@ -272,95 +306,95 @@ export default function Matches() {
   return (
     <div className="min-h-screen bg-background" data-testid="matches-page">
       <Navigation />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Render different modes */}
         {mode === 'team-selection' || mode === 'opponent-selection' ? (
           renderTeamSelection()
         ) : (
           <>
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Matches</h1>
-          <div className="flex gap-2">
-            <Button 
-              onClick={() => navigate('/matches?mode=team-selection')}
-              variant="default"
-              data-testid="button-start-match-flow"
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Start Match (Select Teams)
-            </Button>
-            <Link href={selectedTeamId ? `/create-match?sport=cricket&team1=${selectedTeamId}` : '/create-match'}>
-              <Button variant="outline" data-testid="button-create-match-header">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Match
-              </Button>
-            </Link>
-          </div>
-        </div>
+            <div className="flex justify-between items-center mb-8">
+              <h1 className="text-3xl font-bold">Matches</h1>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => navigate('/matches?mode=team-selection')}
+                  variant="default"
+                  data-testid="button-start-match-flow"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Start Match (Select Teams)
+                </Button>
+                <Link href={selectedTeamId ? `/create-match?sport=cricket&team1=${selectedTeamId}` : '/create-match'}>
+                  <Button variant="outline" data-testid="button-create-match-header">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Match
+                  </Button>
+                </Link>
+              </div>
+            </div>
 
-        {/* Sport Filter */}
-        <div className="mb-8">
-          <Select value={selectedSport} onValueChange={setSelectedSport}>
-            <SelectTrigger className="w-[180px]" data-testid="select-sport-filter">
-              <SelectValue placeholder="All Sports" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Sports</SelectItem>
-              {sports.map((sport) => (
-                <SelectItem key={sport} value={sport}>
-                  {sport.charAt(0).toUpperCase() + sport.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            {/* Sport Filter */}
+            <div className="mb-8">
+              <Select value={selectedSport} onValueChange={setSelectedSport}>
+                <SelectTrigger className="w-[180px]" data-testid="select-sport-filter">
+                  <SelectValue placeholder="All Sports" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sports</SelectItem>
+                  {sports.map((sport) => (
+                    <SelectItem key={sport} value={sport}>
+                      {sport.charAt(0).toUpperCase() + sport.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        {/* Matches Tabs */}
-        <Tabs defaultValue="all" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
-            <TabsTrigger value="all" data-testid="tab-all-matches">
-              All ({allMatches.length})
-            </TabsTrigger>
-            <TabsTrigger value="upcoming" data-testid="tab-upcoming-matches">
-              Upcoming ({upcomingMatches.length})
-            </TabsTrigger>
-            <TabsTrigger value="live" data-testid="tab-live-matches">
-              Live ({liveMatches.length})
-            </TabsTrigger>
-            <TabsTrigger value="my-matches" data-testid="tab-my-matches">
-              My Matches ({userMatches.length})
-            </TabsTrigger>
-          </TabsList>
+            {/* Matches Tabs */}
+            <Tabs defaultValue="all" className="w-full">
+              <TabsList className="grid w-full grid-cols-4 mb-8">
+                <TabsTrigger value="all" data-testid="tab-all-matches">
+                  All ({allMatches.length})
+                </TabsTrigger>
+                <TabsTrigger value="upcoming" data-testid="tab-upcoming-matches">
+                  Upcoming ({upcomingMatches.length})
+                </TabsTrigger>
+                <TabsTrigger value="live" data-testid="tab-live-matches">
+                  Live ({liveMatches.length})
+                </TabsTrigger>
+                <TabsTrigger value="my-matches" data-testid="tab-my-matches">
+                  My Matches ({userMatches.length})
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="all" data-testid="content-all-matches">
-            <MatchesGrid 
-              matches={allMatches} 
-              emptyMessage="No matches available. Create one to get started!" 
-            />
-          </TabsContent>
+              <TabsContent value="all" data-testid="content-all-matches">
+                <MatchesGrid
+                  matches={allMatches}
+                  emptyMessage="No matches available. Create one to get started!"
+                />
+              </TabsContent>
 
-          <TabsContent value="upcoming" data-testid="content-upcoming-matches">
-            <MatchesGrid 
-              matches={upcomingMatches} 
-              emptyMessage="No upcoming matches. Create one or check back later!" 
-            />
-          </TabsContent>
+              <TabsContent value="upcoming" data-testid="content-upcoming-matches">
+                <MatchesGrid
+                  matches={upcomingMatches}
+                  emptyMessage="No upcoming matches. Create one or check back later!"
+                />
+              </TabsContent>
 
-          <TabsContent value="live" data-testid="content-live-matches">
-            <MatchesGrid 
-              matches={liveMatches} 
-              emptyMessage="No live matches right now. Check back during match times!" 
-            />
-          </TabsContent>
+              <TabsContent value="live" data-testid="content-live-matches">
+                <MatchesGrid
+                  matches={liveMatches}
+                  emptyMessage="No live matches right now. Check back during match times!"
+                />
+              </TabsContent>
 
-          <TabsContent value="my-matches" data-testid="content-my-matches">
-            <MatchesGrid 
-              matches={userMatches} 
-              emptyMessage="You haven't joined any matches yet. Find matches to join!" 
-            />
-          </TabsContent>
-        </Tabs>
+              <TabsContent value="my-matches" data-testid="content-my-matches">
+                <MatchesGrid
+                  matches={userMatches}
+                  emptyMessage="You haven't joined any matches yet. Find matches to join!"
+                />
+              </TabsContent>
+            </Tabs>
           </>
         )}
       </div>
@@ -371,23 +405,40 @@ export default function Matches() {
 // Team Card Component for Team Selection
 interface TeamCardProps {
   team: Team;
+  userProfile?: any;
   onStartMatch: () => void;
   mode: string;
 }
 
-function TeamCard({ team, onStartMatch, mode }: TeamCardProps) {
-  const winPercentage = team.totalMatches 
+function TeamCard({ team, userProfile, onStartMatch, mode }: TeamCardProps) {
+  const winPercentage = team.totalMatches
     ? Math.round(((team.matchesWon || 0) / team.totalMatches) * 100)
     : 0;
 
+  const isAllowed = mode === 'opponent-selection' ||
+    (userProfile?.teamRole === "admin" || userProfile?.teamRole === "co-admin");
+
+  const roleLabels: Record<string, string> = {
+    admin: "Admin",
+    "co-admin": "Co-Admin",
+    player: "Player"
+  };
+
   return (
-    <Card className="hover:shadow-lg transition-shadow">
+    <Card className={`hover:shadow-lg transition-shadow relative ${!isAllowed ? 'opacity-75 grayscale-[0.5]' : ''}`}>
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <CardTitle className="text-lg font-semibold truncate" data-testid={`text-team-name-${team.id}`}>
-              {team.name}
-            </CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-lg font-semibold truncate" data-testid={`text-team-name-${team.id}`}>
+                {team.name}
+              </CardTitle>
+              {userProfile && (
+                <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4 bg-primary/10 text-primary border-primary/20">
+                  {roleLabels[userProfile.teamRole] || "Member"}
+                </Badge>
+              )}
+            </div>
             {team.shortName && (
               <Badge variant="outline" className="mt-1">
                 {team.shortName}
@@ -443,12 +494,18 @@ function TeamCard({ team, onStartMatch, mode }: TeamCardProps) {
         </div>
       </CardContent>
 
-      <CardFooter>
-        <Button 
+      <CardFooter className="flex flex-col gap-2">
+        {!isAllowed && mode === 'team-selection' && (
+          <p className="text-[10px] text-red-500 font-medium text-center w-full">
+            Admin/Co-Admin permission required to select this team
+          </p>
+        )}
+        <Button
           onClick={onStartMatch}
           className="w-full flex items-center gap-2"
-          variant="default"
+          variant={isAllowed ? "default" : "secondary"}
           size="sm"
+          disabled={!isAllowed && mode === 'team-selection'}
           data-testid={`button-start-match-${team.id}`}
         >
           <Play className="h-4 w-4" />

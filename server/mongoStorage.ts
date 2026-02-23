@@ -715,7 +715,7 @@ export class MongoStorage implements IStorage {
   }
 
   // Player operations
-  async getPlayers(filters?: { teamId?: string; role?: string; search?: string }): Promise<Player[]> {
+  async getPlayers(filters?: { teamId?: string; role?: string; search?: string; userId?: string }): Promise<Player[]> {
     let query: any = {};
 
     if (filters) {
@@ -724,6 +724,9 @@ export class MongoStorage implements IStorage {
       }
       if (filters.role) {
         query.role = filters.role;
+      }
+      if (filters.userId) {
+        query.userId = filters.userId;
       }
       if (filters.search) {
         query.name = new RegExp(filters.search, 'i');
@@ -771,6 +774,7 @@ export class MongoStorage implements IStorage {
       bowlingStyle: playerData.bowlingStyle || null,
       jerseyNumber: playerData.jerseyNumber || null,
       isGuest: playerData.isGuest || null,
+      teamRole: playerData.teamRole || "player",
       careerStats: {
         // Batting Stats
         totalRuns: 0,
@@ -900,6 +904,7 @@ export class MongoStorage implements IStorage {
       bowlingStyle: null,
       jerseyNumber: null,
       isGuest: null,
+      teamRole: "player",
       careerStats: {
         totalRuns: 0,
         totalBallsFaced: 0,

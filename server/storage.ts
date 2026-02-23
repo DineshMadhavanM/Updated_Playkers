@@ -140,7 +140,7 @@ export interface IStorage {
   }): Promise<Team | undefined>;
 
   // Player operations
-  getPlayers(filters?: { teamId?: string; role?: string; search?: string }): Promise<Player[]>;
+  getPlayers(filters?: { teamId?: string; role?: string; search?: string; userId?: string }): Promise<Player[]>;
   getPlayer(id: string): Promise<Player | undefined>;
   getPlayerByUserId(userId: string): Promise<Player | undefined>;
   createPlayer(player: InsertPlayer): Promise<Player>;

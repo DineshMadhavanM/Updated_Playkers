@@ -170,6 +170,7 @@ export const insertPlayerSchema = z.object({
   bowlingStyle: z.enum(["right-arm-fast", "left-arm-fast", "right-arm-medium", "left-arm-medium", "right-arm-spin", "left-arm-spin", "leg-spin", "off-spin"]).optional(),
   jerseyNumber: z.number().optional(),
   isGuest: z.boolean().optional(),
+  teamRole: z.enum(["admin", "co-admin", "player"]).optional(),
 });
 
 // Player performance validation schema
@@ -960,6 +961,7 @@ export type Player = {
   bowlingStyle: string | null; // right-arm-fast, left-arm-fast, etc.
   jerseyNumber: number | null;
   isGuest: boolean | null; // Guest players for temporary participation
+  teamRole: "admin" | "co-admin" | "player" | null; // Team role: admin, co-admin, or regular player
 
   // Merge metadata (optional for backward compatibility)
   mergedFromPlayerIds?: string[]; // IDs of players that were merged into this one

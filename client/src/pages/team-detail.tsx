@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
-import { ArrowLeft, Users, Edit, UserPlus, Trophy, Target, Calendar, Settings, Trash2 } from "lucide-react";
+import { ArrowLeft, Users, Edit, UserPlus, Trophy, Target, Calendar, Settings, Trash2, Crown, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import type { Team, Player, Match } from "@shared/schema";
 import PlayerManagement from "@/components/player-management";
 import MatchCard from "@/components/match-card";
@@ -19,6 +21,7 @@ export default function TeamDetail() {
   const teamId = params.id!;
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Fetch team data
   const { data: team, isLoading: teamLoading, error: teamError } = useQuery({
@@ -80,6 +83,15 @@ export default function TeamDetail() {
     },
   });
 
+  // Determine current user's role in this team
+  const currentUserPlayer = user
+    ? players.find((p) => p.userId === user.id)
+    : null;
+  const currentUserTeamRole = (currentUserPlayer?.teamRole as string) || null;
+  const isAdminOrCoAdmin =
+    currentUserTeamRole === "admin" || currentUserTeamRole === "co-admin";
+  const isAdmin = currentUserTeamRole === "admin";
+
   if (teamLoading) {
     return <TeamDetailSkeleton />;
   }
@@ -107,10 +119,10 @@ export default function TeamDetail() {
   // Calculate comprehensive cricket team statistics from real match results
   const calculateTeamStats = () => {
     // Filter for cricket matches only to ensure accurate cricket-specific statistics
-    const completedCricketMatches = teamMatches.filter(match => 
+    const completedCricketMatches = teamMatches.filter(match =>
       match.status === 'completed' && match.sport === 'cricket'
     );
-    
+
     let wins = 0;
     let losses = 0;
     let draws = 0;
@@ -120,22 +132,22 @@ export default function TeamDetail() {
     let totalWicketsLost = 0;
     let totalBallsFaced = 0;
     let totalBallsBowled = 0;
-    
+
     completedCricketMatches.forEach(match => {
       const resultSummary = (match.matchData as any)?.resultSummary;
       const matchData = match.matchData as any;
       const scorecard = matchData?.scorecard;
-      
+
       // Determine if current team participated in this match
       const isTeam1 = matchData?.team1Id === teamId;
       const isTeam2 = matchData?.team2Id === teamId;
       const isParticipant = isTeam1 || isTeam2;
-      
+
       // Only count matches where the current team participated
       if (!isParticipant) {
         return;
       }
-      
+
       // Process match result for wins/losses/draws (cricket matches only)
       let hasRealResult = false;
       if (resultSummary?.resultType === 'tied') {
@@ -168,7 +180,7 @@ export default function TeamDetail() {
               // Current team was batting
               totalRunsScored += innings.totalRuns || 0;
               totalWicketsLost += innings.totalWickets || 0;
-              
+
               // Convert overs to balls for accurate NRR calculation
               if (innings.totalOvers) {
                 const overs = parseFloat(innings.totalOvers.toString());
@@ -181,7 +193,7 @@ export default function TeamDetail() {
               // Current team was bowling
               totalWicketsTaken += innings.totalWickets || 0;
               totalRunsConceded += innings.totalRuns || 0;
-              
+
               // Convert overs to balls for accurate NRR calculation
               if (innings.totalOvers) {
                 const overs = parseFloat(innings.totalOvers.toString());
@@ -193,7 +205,7 @@ export default function TeamDetail() {
             }
           });
         }
-        
+
         // Check team2Innings
         if (scorecard.team2Innings) {
           scorecard.team2Innings.forEach((innings: any) => {
@@ -201,7 +213,7 @@ export default function TeamDetail() {
               // Current team was batting
               totalRunsScored += innings.totalRuns || 0;
               totalWicketsLost += innings.totalWickets || 0;
-              
+
               // Convert overs to balls for accurate NRR calculation
               if (innings.totalOvers) {
                 const overs = parseFloat(innings.totalOvers.toString());
@@ -214,7 +226,7 @@ export default function TeamDetail() {
               // Current team was bowling
               totalWicketsTaken += innings.totalWickets || 0;
               totalRunsConceded += innings.totalRuns || 0;
-              
+
               // Convert overs to balls for accurate NRR calculation
               if (innings.totalOvers) {
                 const overs = parseFloat(innings.totalOvers.toString());
@@ -228,18 +240,18 @@ export default function TeamDetail() {
         }
       }
     });
-    
+
     // Only count matches with real results for statistics
     const totalMatches = wins + losses + draws;
     const winRate = totalMatches > 0 ? (wins / totalMatches) * 100 : 0;
-    
+
     // Calculate tournament points (2 points for win, 1 for draw, 0 for loss)
     const tournamentPoints = (wins * 2) + (draws * 1);
-    
+
     // Calculate NRR using proper ball-based formula (balls already calculated in the loop above)
     let netRunRate = 0;
     let hasNRRData = false;
-    
+
     if (totalBallsFaced > 0 && totalBallsBowled > 0) {
       const oversFaced = totalBallsFaced / 6;
       const oversBowled = totalBallsBowled / 6;
@@ -248,7 +260,7 @@ export default function TeamDetail() {
       netRunRate = runsPerOverScored - runsPerOverConceded;
       hasNRRData = true;
     }
-    
+
     return {
       totalMatches, // This is wins + losses + draws (matches with real results only)
       matchesWon: wins,
@@ -275,9 +287,9 @@ export default function TeamDetail() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => navigate('/teams')}
             className="flex items-center gap-2"
             data-testid="button-back-to-teams"
@@ -285,7 +297,7 @@ export default function TeamDetail() {
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-          
+
           <div>
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white" data-testid={`text-team-name-${team.id}`}>
@@ -306,41 +318,59 @@ export default function TeamDetail() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => navigate(`/teams/${teamId}/edit`)}
-            className="flex items-center gap-2"
-            data-testid="button-edit-team"
-          >
-            <Edit className="h-4 w-4" />
-            Edit Team
-          </Button>
-          
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" className="text-red-600 hover:text-red-700">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Team</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete "{team.name}"? This action cannot be undone.
-                  All team data and statistics will be permanently deleted.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-red-600 hover:bg-red-700"
-                  onClick={() => deleteTeamMutation.mutate()}
-                >
-                  Delete Team
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          {/* Show role badge for current user */}
+          {isAdmin && (
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+              <Crown className="h-3 w-3" /> Admin
+            </span>
+          )}
+          {currentUserTeamRole === "co-admin" && (
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+              <ShieldCheck className="h-3 w-3" /> Co-Admin
+            </span>
+          )}
+
+          {/* Edit Team: only for admin or co-admin */}
+          {isAdminOrCoAdmin && (
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/teams/${teamId}/edit`)}
+              className="flex items-center gap-2"
+              data-testid="button-edit-team"
+            >
+              <Edit className="h-4 w-4" />
+              Edit Team
+            </Button>
+          )}
+
+          {/* Delete Team: only for admin */}
+          {isAdmin && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="text-red-600 hover:text-red-700">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Team</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete "{team.name}"? This action cannot be undone.
+                    All team data and statistics will be permanently deleted.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-red-600 hover:bg-red-700"
+                    onClick={() => deleteTeamMutation.mutate()}
+                  >
+                    Delete Team
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
 
@@ -355,7 +385,7 @@ export default function TeamDetail() {
             <div className="text-xs text-muted-foreground mt-1">Real Victories</div>
           </CardContent>
         </Card>
-        
+
         <Card data-testid="card-losses">
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-red-600" data-testid="stat-losses">
@@ -365,7 +395,7 @@ export default function TeamDetail() {
             <div className="text-xs text-muted-foreground mt-1">Actual Defeats</div>
           </CardContent>
         </Card>
-        
+
         <Card data-testid="card-draws">
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-blue-600" data-testid="stat-draws">
@@ -375,7 +405,7 @@ export default function TeamDetail() {
             <div className="text-xs text-muted-foreground mt-1">Tied Matches</div>
           </CardContent>
         </Card>
-        
+
         <Card data-testid="card-total">
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-purple-600" data-testid="stat-total">
@@ -385,7 +415,7 @@ export default function TeamDetail() {
             <div className="text-xs text-muted-foreground mt-1">Completed</div>
           </CardContent>
         </Card>
-        
+
         <Card data-testid="card-win-rate">
           <CardContent className="p-4 text-center">
             <div className={`text-2xl font-bold ${teamStats.winRate >= 50 ? 'text-green-600' : teamStats.winRate >= 30 ? 'text-orange-600' : 'text-red-600'}`} data-testid="stat-win-rate">
@@ -395,7 +425,7 @@ export default function TeamDetail() {
             <div className="text-xs text-muted-foreground mt-1">Success %</div>
           </CardContent>
         </Card>
-        
+
         <Card data-testid="card-tournament-points">
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-yellow-600" data-testid="stat-tournament-points">
@@ -425,8 +455,8 @@ export default function TeamDetail() {
         </TabsList>
 
         <TabsContent value="players">
-          <PlayerManagement 
-            teamId={teamId} 
+          <PlayerManagement
+            teamId={teamId}
             teamName={team.name}
             teamSport={team.sport}
             players={players}
@@ -466,9 +496,9 @@ export default function TeamDetail() {
               ) : (
                 <div className="space-y-4">
                   {teamMatches.map((match) => (
-                    <MatchCard 
-                      key={match.id} 
-                      match={match} 
+                    <MatchCard
+                      key={match.id}
+                      match={match}
                       showActions={false}
                       teamStats={teamStats}
                     />
@@ -515,8 +545,8 @@ export default function TeamDetail() {
                   <div className="flex justify-between">
                     <span>Net Run Rate:</span>
                     <span className={`font-semibold ${teamStats.hasNRRData ? (teamStats.netRunRate >= 0 ? 'text-green-600' : 'text-red-600') : 'text-gray-500'}`} data-testid="stats-net-run-rate">
-                      {teamStats.hasNRRData ? 
-                        `${teamStats.netRunRate >= 0 ? '+' : ''}${teamStats.netRunRate.toFixed(3)}` : 
+                      {teamStats.hasNRRData ?
+                        `${teamStats.netRunRate >= 0 ? '+' : ''}${teamStats.netRunRate.toFixed(3)}` :
                         'No data available'
                       }
                     </span>

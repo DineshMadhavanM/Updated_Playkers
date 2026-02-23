@@ -66,7 +66,7 @@ interface Substitution {
 
 export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPlayers = [] }: FootballScorerProps) {
   const { toast } = useToast();
-  
+
   // Match state
   const [team1Goals, setTeam1Goals] = useState(0);
   const [team2Goals, setTeam2Goals] = useState(0);
@@ -76,23 +76,23 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
   const [isHalfTime, setIsHalfTime] = useState(false);
   const [isMatchCompleted, setIsMatchCompleted] = useState(false);
   const [matchResult, setMatchResult] = useState("");
-  
+
   // Player management
   const [team1Players, setTeam1Players] = useState<PlayerStats[]>([]);
   const [team2Players, setTeam2Players] = useState<PlayerStats[]>([]);
   const [team1Substitutions, setTeam1Substitutions] = useState<Substitution[]>([]);
   const [team2Substitutions, setTeam2Substitutions] = useState<Substitution[]>([]);
-  
+
   // Match events
   const [matchEvents, setMatchEvents] = useState<MatchEvent[]>([]);
-  
+
   // Dialog states
   const [showGoalDialog, setShowGoalDialog] = useState(false);
   const [showCardDialog, setShowCardDialog] = useState(false);
   const [showSubDialog, setShowSubDialog] = useState(false);
   const [showManOfMatchDialog, setShowManOfMatchDialog] = useState(false);
   const [showStartingXIDialog, setShowStartingXIDialog] = useState(true);
-  
+
   // Dialog selections
   const [selectedTeam, setSelectedTeam] = useState<1 | 2>(1);
   const [selectedScorer, setSelectedScorer] = useState("");
@@ -103,14 +103,14 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
   const [selectedPlayerOut, setSelectedPlayerOut] = useState("");
   const [selectedPlayerIn, setSelectedPlayerIn] = useState("");
   const [selectedManOfMatch, setSelectedManOfMatch] = useState("");
-  
+
   // Flash effects
   const [showGoalFlash, setShowGoalFlash] = useState(false);
   const [showCardFlash, setShowCardFlash] = useState(false);
-  
+
   // State history for undo
   const [stateHistory, setStateHistory] = useState<any[]>([]);
-  
+
   // Match saving
   const [isSavingMatch, setIsSavingMatch] = useState(false);
 
@@ -119,7 +119,7 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
     if (rosterPlayers && rosterPlayers.length > 0 && team1Players.length === 0 && team2Players.length === 0) {
       const team1Roster = rosterPlayers.filter((p: any) => p.team === 'team1');
       const team2Roster = rosterPlayers.filter((p: any) => p.team === 'team2');
-      
+
       if (team1Roster.length > 0 && team2Roster.length > 0) {
         setShowStartingXIDialog(true);
       }
@@ -216,13 +216,13 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
   const updatePlayerStats = (team: 1 | 2, playerName: string, statsUpdate: Partial<PlayerStats>) => {
     const setPlayers = team === 1 ? setTeam1Players : setTeam2Players;
     const players = team === 1 ? team1Players : team2Players;
-    
+
     setPlayers(prev => prev.map(p => {
       if (p.name === playerName) {
         // Calculate new values based on current player state
         const currentPlayer = players.find(pl => pl.name === playerName);
         if (!currentPlayer) return p;
-        
+
         // Merge updates with current values
         const updates: Partial<PlayerStats> = {};
         if (statsUpdate.goals !== undefined) updates.goals = statsUpdate.goals;
@@ -232,7 +232,7 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
         if (statsUpdate.fouls !== undefined) updates.fouls = statsUpdate.fouls;
         if (statsUpdate.isSubstituted !== undefined) updates.isSubstituted = statsUpdate.isSubstituted;
         if (statsUpdate.minutesPlayed !== undefined) updates.minutesPlayed = statsUpdate.minutesPlayed;
-        
+
         return { ...p, ...updates };
       }
       return p;
@@ -281,7 +281,7 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
       updatePlayerStats(selectedTeam, selectedScorer, {
         goals: (team1Players.find(p => p.name === selectedScorer)?.goals || 0) + 1
       });
-      
+
       if (selectedAssist) {
         updatePlayerStats(selectedTeam, selectedAssist, {
           assists: (team1Players.find(p => p.name === selectedAssist)?.assists || 0) + 1
@@ -470,7 +470,7 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
     if (!isLive) return;
     saveStateSnapshot();
     setIsHalfTime(true);
-    
+
     const event: MatchEvent = {
       minute: 45 + (injuryTime > 0 ? injuryTime : 0),
       eventType: 'half-time',
@@ -564,7 +564,7 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
     try {
       // Build match data
       const matchData = match.matchData as any || {};
-      
+
       const updatedMatch = {
         status: 'completed',
         team1Score: { goals: team1Goals },
@@ -999,6 +999,9 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
         <DialogContent>
           <DialogHeader>
             <DialogTitle>⚽ Goal for {selectedTeam === 1 ? (match.team1Name || 'Team 1') : (match.team2Name || 'Team 2')}</DialogTitle>
+            <DialogDescription className="sr-only">
+              Enter details for the goal scored, including scorer and assistant.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -1060,6 +1063,9 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
             <DialogTitle>
               {cardType === 'yellow' ? '🟨 Yellow Card' : '🟥 Red Card'} for {selectedTeam === 1 ? (match.team1Name || 'Team 1') : (match.team2Name || 'Team 2')}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Select the player who received the discipline card.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Label>Player *</Label>
@@ -1086,6 +1092,9 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
         <DialogContent>
           <DialogHeader>
             <DialogTitle>🔄 Substitution for {selectedTeam === 1 ? (match.team1Name || 'Team 1') : (match.team2Name || 'Team 2')}</DialogTitle>
+            <DialogDescription className="sr-only">
+              Select the player going off and the substitute coming on.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>

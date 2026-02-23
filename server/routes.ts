@@ -162,6 +162,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Set user in session (password already stripped by loginUser)
         (req as any).session.user = user;
 
+        // Auto-link to player profile if email matches
+        storage.linkPlayerToUserByEmail(email).then(linkResult => {
+          if (linkResult.success) {
+            console.log(`✅ Auto-linked user ${user.id} to player ${linkResult.playerId} via email ${email} on login`);
+          }
+        }).catch(linkError => {
+          console.warn('Failed to auto-link player on login:', linkError);
+        });
+
         res.json({
           message: "Login successful",
           user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName }
@@ -1304,6 +1313,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // Update player's team role (admin/co-admin/player)
+  app.patch('/api/players/:id/team-role', requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { teamRole } = req.body;
+
+      if (!["admin", "co-admin", "player"].includes(teamRole)) {
+        return res.status(400).json({ message: "Invalid teamRole. Must be 'admin', 'co-admin', or 'player'" });
+      }
+
+      const player = await storage.getPlayer(id);
+      if (!player) {
+        return res.status(404).json({ message: "Player not found" });
+      }
+
+      const updatedPlayer = await storage.updatePlayer(id, { teamRole } as any);
+      if (!updatedPlayer) {
+        return res.status(500).json({ message: "Failed to update player role" });
+      }
+
+      res.json(updatedPlayer);
+    } catch (error) {
+      console.error("Error updating player team role:", error);
+      res.status(500).json({ message: "Failed to update player team role" });
+    }
+  });
+
   // Team routes
   app.get('/api/teams', async (req, res) => {
     try {
@@ -1390,16 +1427,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Player routes
   app.get('/api/players', async (req, res) => {
     try {
-      const { teamId, role, search } = req.query;
+      const { teamId, role, search, userId } = req.query;
       const players = await storage.getPlayers({
         teamId: teamId as string,
         role: role as string,
         search: search as string,
+        userId: userId as string,
       });
       res.json(players);
     } catch (error) {
       console.error("Error fetching players:", error);
       res.status(500).json({ message: "Failed to fetch players" });
+    }
+  });
+
+  app.get('/api/user/players', requireAuth, async (req: any, res) => {
+    try {
+      const players = await storage.getPlayers({
+        userId: req.user.id
+      });
+      res.json(players);
+    } catch (error) {
+      console.error("Error fetching user players:", error);
+      res.status(500).json({ message: "Failed to fetch user player profiles" });
     }
   });
 

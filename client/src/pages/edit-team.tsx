@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
-import { ArrowLeft, Users, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Users, Save, Loader2, Shield, ShieldCheck, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -10,10 +10,23 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { insertTeamSchema } from "@shared/schema";
-import type { InsertTeam, Team } from "@shared/schema";
+import type { InsertTeam, Team, Player } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+const ROLE_ICONS: Record<string, React.ReactNode> = {
+  admin: <Crown className="h-4 w-4 text-yellow-500" />,
+  "co-admin": <ShieldCheck className="h-4 w-4 text-blue-500" />,
+  player: <Users className="h-4 w-4 text-gray-400" />,
+};
+
+const ROLE_BADGE_STYLES: Record<string, string> = {
+  admin: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  "co-admin": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  player: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+};
 
 export default function EditTeam() {
   const params = useParams();
@@ -26,11 +39,20 @@ export default function EditTeam() {
     queryKey: ['/api/teams', teamId],
     queryFn: async (): Promise<Team> => {
       const response = await fetch(`/api/teams/${teamId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch team');
-      }
+      if (!response.ok) throw new Error('Failed to fetch team');
       return response.json();
     },
+  });
+
+  // Fetch team players
+  const { data: players = [], isLoading: playersLoading } = useQuery({
+    queryKey: ['/api/players', { teamId }],
+    queryFn: async (): Promise<Player[]> => {
+      const response = await fetch(`/api/players?teamId=${teamId}`);
+      if (!response.ok) throw new Error('Failed to fetch players');
+      return response.json();
+    },
+    enabled: !!teamId,
   });
 
   const form = useForm<InsertTeam>({
@@ -61,22 +83,37 @@ export default function EditTeam() {
       return response.json();
     },
     onSuccess: (updatedTeam) => {
-      // Invalidate relevant caches
       queryClient.invalidateQueries({ queryKey: ['/api/teams'] });
       queryClient.invalidateQueries({ queryKey: ['/api/teams', teamId] });
-      
       toast({
         title: "Team updated successfully!",
         description: `${updatedTeam.name} has been updated.`,
       });
-      
-      // Navigate back to team detail page
       navigate(`/teams/${teamId}`);
     },
     onError: (error: any) => {
       toast({
         title: "Error updating team",
         description: error.message || "Failed to update team. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation to update a player's team role
+  const updatePlayerRoleMutation = useMutation({
+    mutationFn: async ({ playerId, teamRole }: { playerId: string; teamRole: string }) => {
+      const response = await apiRequest('PATCH', `/api/players/${playerId}/team-role`, { teamRole });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/players', { teamId }] });
+      toast({ title: "Role updated", description: "Player role has been updated." });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error updating role",
+        description: error.message || "Failed to update player role.",
         variant: "destructive",
       });
     },
@@ -113,9 +150,9 @@ export default function EditTeam() {
     <div className="container mx-auto p-6 max-w-4xl">
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => navigate(`/teams/${teamId}`)}
           className="flex items-center gap-2"
           data-testid="button-back-to-team"
@@ -123,7 +160,7 @@ export default function EditTeam() {
           <ArrowLeft className="h-4 w-4" />
           Back to Team
         </Button>
-        
+
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Users className="h-8 w-8" />
@@ -136,7 +173,7 @@ export default function EditTeam() {
       </div>
 
       {/* Edit Team Form */}
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>Team Information</CardTitle>
         </CardHeader>
@@ -268,7 +305,7 @@ export default function EditTeam() {
                     </div>
                     <div>
                       <span className="font-semibold">{team.matchesLost || 0}</span>
-                      <br />Losses  
+                      <br />Losses
                     </div>
                     <div>
                       <span className="font-semibold">{team.tournamentPoints || 0}</span>
@@ -298,7 +335,7 @@ export default function EditTeam() {
                     </>
                   )}
                 </Button>
-                
+
                 <Button
                   type="button"
                   variant="outline"
@@ -311,6 +348,111 @@ export default function EditTeam() {
               </div>
             </form>
           </Form>
+        </CardContent>
+      </Card>
+
+      {/* Team Members - Role Assignment */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-blue-600" />
+            Team Members &amp; Roles
+          </CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Assign <span className="font-semibold text-yellow-600">Admin</span> or{" "}
+            <span className="font-semibold text-blue-600">Co-Admin</span> roles.
+            Only Admin and Co-Admin can edit the team and start a match.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {playersLoading ? (
+            <div className="space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div>
+                      <Skeleton className="h-4 w-32 mb-1" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-9 w-36" />
+                </div>
+              ))}
+            </div>
+          ) : players.length === 0 ? (
+            <div className="text-center py-10 text-gray-500">
+              <Users className="h-12 w-12 mx-auto mb-3 opacity-40" />
+              <p>No players in this team yet.</p>
+              <p className="text-sm mt-1">Add players from the team detail page first.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {players.map((player) => {
+                const currentRole = (player.teamRole as string) || "player";
+                return (
+                  <div
+                    key={player.id}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Avatar circle */}
+                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                        {player.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {player.name}
+                          </span>
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_BADGE_STYLES[currentRole]}`}>
+                            {ROLE_ICONS[currentRole]}
+                            {currentRole.charAt(0).toUpperCase() + currentRole.slice(1)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {player.role || "No position"} {player.jerseyNumber ? `• #${player.jerseyNumber}` : ""}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Role selector */}
+                    <Select
+                      value={currentRole}
+                      onValueChange={(newRole) =>
+                        updatePlayerRoleMutation.mutate({ playerId: player.id, teamRole: newRole })
+                      }
+                      disabled={updatePlayerRoleMutation.isPending}
+                    >
+                      <SelectTrigger className="w-36">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">
+                          <div className="flex items-center gap-2">
+                            <Crown className="h-4 w-4 text-yellow-500" />
+                            Admin
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="co-admin">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4 text-blue-500" />
+                            Co-Admin
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="player">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-gray-500" />
+                            Player
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -329,7 +471,7 @@ function EditTeamSkeleton() {
         </div>
       </div>
 
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
           <Skeleton className="h-6 w-32" />
         </CardHeader>
@@ -353,6 +495,28 @@ function EditTeamSkeleton() {
               <Skeleton className="h-10 w-32" />
               <Skeleton className="h-10 w-20" />
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-40" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div>
+                    <Skeleton className="h-4 w-32 mb-1" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                </div>
+                <Skeleton className="h-9 w-36" />
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

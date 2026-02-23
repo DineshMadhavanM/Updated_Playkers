@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Plus, Search, Users, Trophy, Target, Calendar, Play, Footprints, Hand, CircleDot, Activity } from "lucide-react";
+import { Plus, Search, Users, Trophy, Target, Calendar, Play, Footprints, Hand, CircleDot, Activity, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import type { Team } from "@shared/schema";
 
 interface TeamsResponse {
@@ -18,9 +19,23 @@ type SportType = "cricket" | "football" | "handball" | "tennis" | "kabaddi" | "a
 
 export default function Teams() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSport, setSelectedSport] = useState<SportType>("all");
+
+  // Get current user's player profiles across all teams to check roles
+  const { data: userPlayerProfiles = [] } = useQuery({
+    queryKey: ["/api/user/players"],
+    queryFn: async () => {
+      const response = await fetch("/api/user/players");
+      if (!response.ok) throw new Error("Failed to fetch player profiles");
+      return response.json();
+    },
+    enabled: !!user,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Fetch teams from API
   const { data, isLoading, error } = useQuery({
@@ -74,9 +89,9 @@ export default function Teams() {
             Manage your teams, players, and track performance
           </p>
         </div>
-        
-        <Button 
-          onClick={() => navigate('/teams/create')} 
+
+        <Button
+          onClick={() => navigate('/teams/create')}
           className="flex items-center gap-2"
           data-testid="button-create-team"
         >
@@ -95,11 +110,10 @@ export default function Teams() {
             return (
               <Card
                 key={sport.id}
-                className={`cursor-pointer transition-all hover:scale-105 ${
-                  isSelected 
-                    ? 'ring-2 ring-primary shadow-lg' 
-                    : 'hover:shadow-md'
-                }`}
+                className={`cursor-pointer transition-all hover:scale-105 ${isSelected
+                  ? 'ring-2 ring-primary shadow-lg'
+                  : 'hover:shadow-md'
+                  }`}
                 onClick={() => setSelectedSport(sport.id as SportType)}
                 data-testid={`card-sport-${sport.id}`}
               >
@@ -158,13 +172,13 @@ export default function Teams() {
             {searchQuery ? 'No teams found' : 'No teams yet'}
           </h3>
           <p className="text-gray-600 dark:text-gray-300 mb-4">
-            {searchQuery 
+            {searchQuery
               ? 'Try adjusting your search terms'
               : 'Create your first team to get started with team management'
             }
           </p>
           {!searchQuery && (
-            <Button 
+            <Button
               onClick={() => navigate('/teams/create')}
               data-testid="button-create-first-team"
             >
@@ -175,9 +189,17 @@ export default function Teams() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {teams.map((team) => (
-            <TeamCard key={team.id} team={team} />
-          ))}
+          {teams.map((team) => {
+            const userProfile = userPlayerProfiles.find((p: any) => p.teamId === team.id);
+            return (
+              <TeamCard
+                key={team.id}
+                team={team}
+                userProfile={userProfile}
+                isSiteAdmin={!!user?.isAdmin}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -215,15 +237,15 @@ export default function Teams() {
 }
 
 // Team Card Component
-function TeamCard({ team }: { team: Team }) {
+function TeamCard({ team, userProfile, isSiteAdmin }: { team: Team; userProfile?: any; isSiteAdmin: boolean }) {
   const [, navigate] = useLocation();
 
-  const winPercentage = team.totalMatches 
+  const winPercentage = team.totalMatches
     ? Math.round(((team.matchesWon || 0) / team.totalMatches) * 100)
     : 0;
 
   return (
-    <Card 
+    <Card
       className="hover:shadow-lg transition-shadow cursor-pointer"
       onClick={() => navigate(`/teams/${team.id}`)}
       data-testid={`card-team-${team.id}`}
@@ -308,20 +330,38 @@ function TeamCard({ team }: { team: Team }) {
             {team.totalMatches || 0} matches
           </div>
         </div>
-        
-        <Button 
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate('/matches?mode=opponent-selection&team=' + team.id);
-          }}
-          className="w-full flex items-center gap-2"
-          variant="default"
-          size="sm"
-          data-testid={`button-start-match-${team.id}`}
-        >
-          <Play className="h-4 w-4" />
-          Start a Match
-        </Button>
+
+        <div className="flex gap-2 w-full">
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate('/matches?mode=opponent-selection&team=' + team.id);
+            }}
+            className="flex-1 flex items-center gap-2"
+            variant="default"
+            size="sm"
+            data-testid={`button-start-match-${team.id}`}
+          >
+            <Play className="h-4 w-4" />
+            Start Match
+          </Button>
+
+          {(isSiteAdmin || userProfile?.teamRole === "admin" || userProfile?.teamRole === "co-admin") && (
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/teams/${team.id}/edit`);
+              }}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              data-testid={`button-edit-team-${team.id}`}
+            >
+              <Edit className="h-4 w-4" />
+              Edit
+            </Button>
+          )}
+        </div>
       </CardFooter>
     </Card>
   );
