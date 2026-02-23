@@ -7,10 +7,10 @@ import dns from 'node:dns';
 import tls from 'node:tls';
 
 // Configure DNS to prefer IPv4 for MongoDB Atlas compatibility in Replit
-dns.setDefaultResultOrder('ipv4first');
+// dns.setDefaultResultOrder('ipv4first');
 
 // Set minimum TLS version to 1.2 for Atlas compatibility
-(tls as any).DEFAULT_MIN_VERSION = 'TLSv1.2';
+// (tls as any).DEFAULT_MIN_VERSION = 'TLSv1.2';
 
 const app = express();
 app.use(express.json());
