@@ -9,11 +9,20 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Users, Play, ArrowLeft } from "lucide-react";
+import { Plus, Search, Users, Play, ArrowLeft, Trophy } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import type { Team } from "@shared/schema";
 
 export default function Matches() {
@@ -32,6 +41,12 @@ export default function Matches() {
   const [teamSearchQuery, setTeamSearchQuery] = useState("");
   const [citySearchQuery, setCitySearchQuery] = useState("");
   const [selectionTab, setSelectionTab] = useState("my-teams");
+
+  // Match Type Dialog State
+  const [showMatchTypeDialog, setShowMatchTypeDialog] = useState(false);
+  const [selectedMatchType, setSelectedMatchType] = useState("Friendly");
+  const [customOvers, setCustomOvers] = useState("");
+  const [pendingOpponent, setPendingOpponent] = useState<Team | null>(null);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -198,14 +213,38 @@ export default function Matches() {
     } else if (mode === 'opponent-selection') {
       if (!selectedTeamId) return;
 
-      // Opponent selected, send match request
-      // In this mode, selectedTeamId is OUR team (team1), and 'team' is the OPPONENT (team2)
-      matchRequestMutation.mutate({
-        team1Id: selectedTeamId,
-        team2Id: team.id,
-        matchType: "Friendly" // Default to friendly for now
-      });
+      // For opponent selection, if it's cricket, show match type dialog
+      if (team.sport === 'cricket' || (selectedTeam && selectedTeam.sport === 'cricket')) {
+        setPendingOpponent(team);
+        setShowMatchTypeDialog(true);
+      } else {
+        // Opponent selected, send match request directly for other sports
+        // In this mode, selectedTeamId is OUR team (team1), and 'team' is the OPPONENT (team2)
+        matchRequestMutation.mutate({
+          team1Id: selectedTeamId,
+          team2Id: team.id,
+          matchType: "Friendly" // Default to friendly for now
+        });
+      }
     }
+  };
+
+  const confirmMatchRequest = () => {
+    if (!selectedTeamId || !pendingOpponent) return;
+
+    let finalMatchType = selectedMatchType;
+    if (selectedMatchType === "Custom Match" && customOvers) {
+      finalMatchType = `${customOvers} Overs`;
+    }
+
+    matchRequestMutation.mutate({
+      team1Id: selectedTeamId,
+      team2Id: pendingOpponent.id,
+      matchType: finalMatchType
+    });
+
+    setShowMatchTypeDialog(false);
+    setPendingOpponent(null);
   };
 
   const MatchesGrid = ({ matches, emptyMessage }: { matches: any[]; emptyMessage: string }) => (
@@ -486,6 +525,73 @@ export default function Matches() {
             </Tabs>
           </>
         )}
+
+        {/* Match Type Selection Dialog */}
+        <Dialog open={showMatchTypeDialog} onOpenChange={setShowMatchTypeDialog}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-primary" />
+                Select Match Type
+              </DialogTitle>
+              <DialogDescription>
+                Choose the format for your match against {pendingOpponent?.name}.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label>Match Format</Label>
+                <Select
+                  value={selectedMatchType}
+                  onValueChange={(value) => {
+                    setSelectedMatchType(value);
+                    if (value !== "Custom Match") setCustomOvers("");
+                  }}
+                >
+                  <SelectTrigger data-testid="select-match-type-dialog">
+                    <SelectValue placeholder="Select match type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Friendly">Friendly</SelectItem>
+                    <SelectItem value="Custom Match">Custom Match</SelectItem>
+                    <SelectItem value="10 Overs">10 Overs</SelectItem>
+                    <SelectItem value="20 Overs">20 Overs</SelectItem>
+                    <SelectItem value="30 Overs">30 Overs</SelectItem>
+                    <SelectItem value="50 Overs">50 Overs</SelectItem>
+                    <SelectItem value="Test">Test</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedMatchType === "Custom Match" && (
+                <div className="space-y-2">
+                  <Label htmlFor="custom-overs">Number of Overs</Label>
+                  <Input
+                    id="custom-overs"
+                    type="number"
+                    placeholder="e.g. 15"
+                    value={customOvers}
+                    onChange={(e) => setCustomOvers(e.target.value)}
+                    data-testid="input-custom-overs-dialog"
+                  />
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowMatchTypeDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmMatchRequest}
+                disabled={matchRequestMutation.isPending || (selectedMatchType === "Custom Match" && !customOvers)}
+              >
+                {matchRequestMutation.isPending ? "Sending..." : "Send Match Request"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
