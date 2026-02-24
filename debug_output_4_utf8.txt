@@ -1,0 +1,122 @@
+﻿npx : Error: MongoSer
+verSelectionError: 
+Server selection 
+timed out after 5000 
+ms
+At line:1 char:1
++ npx tsx 
+debug_user.ts > 
+debug_output_4.txt 
+2>&1
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~
+    + CategoryInfo   
+           : 
+NotSpecified: (E    
+rror: MongoSer...t 
+af    ter 5000 
+ms:String) [    ], 
+RemoteException
+    + 
+FullyQualifiedError  
+  Id : 
+NativeCommandErr    
+or
+ 
+    at Topology.selec
+tServer (C:\PLAYKERS-
+BOOKING_NEW-main (2)\
+PLAYKERS-BOOKING_NEW-
+main\node_modules\mon
+godb\src\sdam\topolog
+y.ts:635:30)
+    at async 
+Topology._connect (C:
+\PLAYKERS-BOOKING_NEW
+-main (2)\PLAYKERS-BO
+OKING_NEW-main\node_m
+odules\mongodb\src\sd
+am\topology.ts:467:22
+)
+    at async 
+Topology.connect (C:\
+PLAYKERS-BOOKING_NEW-
+main (2)\PLAYKERS-BOO
+KING_NEW-main\node_mo
+dules\mongodb\src\sda
+m\topology.ts:404:7)
+    at async 
+topologyConnect (C:\P
+LAYKERS-BOOKING_NEW-m
+ain (2)\PLAYKERS-BOOK
+ING_NEW-main\node_mod
+ules\mongodb\src\mong
+o_client.ts:682:9)
+    at async 
+MongoClient._connect 
+(C:\PLAYKERS-BOOKING_
+NEW-main (2)\PLAYKERS
+-BOOKING_NEW-main\nod
+e_modules\mongodb\src
+\mongo_client.ts:694:
+7)
+    at async 
+MongoClient.connect (
+C:\PLAYKERS-BOOKING_N
+EW-main (2)\PLAYKERS-
+BOOKING_NEW-main\node
+_modules\mongodb\src\
+mongo_client.ts:606:7
+)
+    at async 
+MongoStorage.connect 
+(C:\PLAYKERS-BOOKING_
+NEW-main (2)\PLAYKERS
+-BOOKING_NEW-main\ser
+ver\mongoStorage.ts:9
+2:5)
+    at async run (C:\
+PLAYKERS-BOOKING_NEW-
+main (2)\PLAYKERS-BOO
+KING_NEW-main\debug_u
+ser.ts:12:9) {
+  errorLabelSet: 
+Set(0) {},
+  reason: 
+TopologyDescription {
+    type: 'ReplicaSet
+NoPrimary',
+    servers: Map(3) {
+      'ac-4hxdhic-sha
+rd-00-00.fbleyeo.mong
+odb.net:27017' => 
+[ServerDescription],
+      'ac-4hxdhic-sha
+rd-00-01.fbleyeo.mong
+odb.net:27017' => 
+[ServerDescription],
+      'ac-4hxdhic-sha
+rd-00-02.fbleyeo.mong
+odb.net:27017' => 
+[ServerDescription]
+    },
+    stale: false,
+    compatible: true,
+    heartbeatFrequenc
+yMS: 10000,
+    
+localThresholdMS: 15,
+    setName: 'atlas-1
+tc59v-shard-0',
+    maxElectionId: 
+null,
+    maxSetVersion: 
+null,
+    
+commonWireVersion: 0,
+    logicalSessionTim
+eoutMinutes: 30
+  },
+  code: undefined
+}

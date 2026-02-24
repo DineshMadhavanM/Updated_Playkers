@@ -100,6 +100,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize email/password authentication
   initializeEmailAuth(app);
 
+  // DEBUG ENDPOINT - REMOVE AFTER USE
+  app.get("/api/debug/user-stats/:email", async (req, res) => {
+    try {
+      const email = req.params.email;
+      const db = (storage as any).db;
+      if (!db) return res.status(500).json({ message: "DB not initialized" });
+
+      const collections = await db.listCollections().toArray();
+      const counts: any = {};
+      for (const coll of collections) {
+        counts[coll.name] = await db.collection(coll.name).countDocuments();
+      }
+
+      const players = await db.collection('players').find({
+        email: { $regex: new RegExp('^' + email.replace('.', '\\.') + '$', 'i') }
+      }).toArray();
+
+      const user = await db.collection('users').findOne({
+        email: { $regex: new RegExp('^' + email.replace('.', '\\.') + '$', 'i') }
+      });
+
+      const perfs = await db.collection('playerPerformances').find({
+        $or: [
+          { playerEmail: email },
+          { userId: user?.id },
+          { playerId: { $in: players.map((p: any) => p.id) } }
+        ]
+      }).toArray();
+
+      const recentMatches = await db.collection('matches').find({ status: 'completed' }).sort({ updatedAt: -1 }).limit(5).toArray();
+
+      const allPlayers = await db.collection('players').find({}).toArray();
+
+      res.json({
+        email,
+        counts,
+        user: user ? { id: user.id, email: user.email } : null,
+        players: players.map((p: any) => ({ id: p.id, name: p.name, email: p.email, userId: p.userId, careerStats: p.careerStats })),
+        performancesCount: perfs.length,
+        recentMatches: recentMatches.map((m: any) => ({
+          id: m.id,
+          title: m.title,
+          updatedAt: m.updatedAt,
+          scorecardPlayerIds: [
+            ...(m.matchData?.scorecard?.team1Innings || []),
+            ...(m.matchData?.scorecard?.team2Innings || [])
+          ].flatMap((inn: any) => [
+            ...(inn.batsmen || []).map((b: any) => b.playerId),
+            ...(inn.bowlers || []).map((bw: any) => bw.playerId)
+          ])
+        })),
+        allPlayersCount: allPlayers.length,
+        matchedPlayersBySimilarName: allPlayers.filter((p: any) => p.name.toLowerCase().includes('dinesh') || p.name.toLowerCase().includes('madhavan'))
+          .map((p: any) => ({ id: p.id, name: p.name, email: p.email }))
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Middleware to make email/password auth compatible with req.user pattern
   // This allows endpoints checking req.user to work with session-based auth
   app.use(async (req: any, res, next) => {
@@ -2033,27 +2093,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📊 DATA FLOW STEP 4: Extracting individual player statistics from scorecard`);
       const { finalScorecard, awards, resultSummary } = completionData;
 
-      // Determine team IDs from match data
+      // Determine team IDs and names from match data
       const team1Id = (existingMatch.matchData as any)?.team1Id || null;
       const team2Id = (existingMatch.matchData as any)?.team2Id || null;
+      const team1Name = existingMatch.team1Name || (existingMatch.matchData as any)?.team1Name;
+      const team2Name = existingMatch.team2Name || (existingMatch.matchData as any)?.team2Name;
       const winnerId = resultSummary.winnerId;
 
-      console.log(`🏏 Teams: ${team1Id} vs ${team2Id}, Winner: ${winnerId || 'None'}`);
+      console.log(`🏏 Teams: ${team1Name} (${team1Id}) vs ${team2Name} (${team2Id}), Winner: ${winnerId || 'None'}`);
 
       // Extract player statistics from scorecard
       const playerStats: any[] = [];
       console.log(`📈 Processing player performance data from innings...`);
 
       // Process both innings for player stats
-      [...(finalScorecard.team1Innings || []), ...(finalScorecard.team2Innings || [])].forEach(innings => {
+      [...(finalScorecard.team1Innings || []), ...(finalScorecard.team2Innings || [])].forEach((innings: any) => {
         // Add batting stats
-        innings.batsmen?.forEach(batsman => {
+        innings.batsmen?.forEach((batsman: any) => {
           const existingPlayerStat = playerStats.find(p => p.playerId === batsman.playerId);
           if (existingPlayerStat) {
             existingPlayerStat.runsScored = (existingPlayerStat.runsScored || 0) + batsman.runsScored;
             existingPlayerStat.ballsFaced = (existingPlayerStat.ballsFaced || 0) + batsman.ballsFaced;
             existingPlayerStat.fours = (existingPlayerStat.fours || 0) + batsman.fours;
             existingPlayerStat.sixes = (existingPlayerStat.sixes || 0) + batsman.sixes;
+            // Update dismissal if not already out
+            if (!existingPlayerStat.isOut && batsman.dismissalType !== 'not-out') {
+              existingPlayerStat.isOut = true;
+              existingPlayerStat.dismissalType = batsman.dismissalType;
+            }
           } else {
             playerStats.push({
               playerId: batsman.playerId,
@@ -2063,12 +2130,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               fours: batsman.fours,
               sixes: batsman.sixes,
               isOut: batsman.dismissalType !== 'not-out',
+              dismissalType: batsman.dismissalType === 'not-out' ? null : batsman.dismissalType,
             });
           }
         });
 
         // Add bowling stats
-        innings.bowlers?.forEach(bowler => {
+        innings.bowlers?.forEach((bowler: any) => {
           const existingPlayerStat = playerStats.find(p => p.playerId === bowler.playerId);
           if (existingPlayerStat) {
             existingPlayerStat.oversBowled = (existingPlayerStat.oversBowled || 0) + bowler.overs;
@@ -2076,22 +2144,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             existingPlayerStat.wicketsTaken = (existingPlayerStat.wicketsTaken || 0) + bowler.wickets;
             existingPlayerStat.maidens = (existingPlayerStat.maidens || 0) + bowler.maidens;
           } else {
-            const existingBattingStat = playerStats.find(p => p.playerId === bowler.playerId);
-            if (existingBattingStat) {
-              existingBattingStat.oversBowled = bowler.overs;
-              existingBattingStat.runsGiven = bowler.runsGiven;
-              existingBattingStat.wicketsTaken = bowler.wickets;
-              existingBattingStat.maidens = bowler.maidens;
-            } else {
-              playerStats.push({
-                playerId: bowler.playerId,
-                teamId: innings.battingTeamId === team1Id ? team2Id : team1Id, // Bowler is from opposite team
-                oversBowled: bowler.overs,
-                runsGiven: bowler.runsGiven,
-                wicketsTaken: bowler.wickets,
-                maidens: bowler.maidens,
-              });
-            }
+            playerStats.push({
+              playerId: bowler.playerId,
+              teamId: innings.battingTeamId === team1Id ? team2Id : team1Id, // Bowler is from opposite team
+              oversBowled: bowler.overs,
+              runsGiven: bowler.runsGiven,
+              wicketsTaken: bowler.wickets,
+              maidens: bowler.maidens,
+            });
           }
         });
       });
@@ -2137,18 +2197,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let userStatsUpdated = 0;
       const userStatsErrors: string[] = [];
 
-      if (team1Id && team2Id && playerStats.length > 0) {
+      if (playerStats.length > 0) {
         const matchResultsData = {
           matchId,
           status: 'completed' as const,
           team1Id,
           team2Id,
+          team1Name,
+          team2Name,
           winnerTeamId: winnerId,
           scorecard: finalScorecard,
           awards,
           resultSummary,
           playerStats
         };
+
         applyResult = await storage.applyMatchResults(matchResultsData);
 
         if (!applyResult.success) {

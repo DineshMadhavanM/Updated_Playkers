@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import type { Player, Match, Team } from "@shared/schema";
+import type { Player, Match, Team, PlayerPerformance } from "@shared/schema";
 import MatchCard from "@/components/match-card";
 
 export default function PlayerProfile() {
@@ -54,6 +54,21 @@ export default function PlayerProfile() {
     enabled: !!playerId,
   });
 
+  // Fetch player match performances
+  const { data: performancesData } = useQuery({
+    queryKey: ['/api/players', playerId, 'performances'],
+    queryFn: async () => {
+      const response = await fetch(`/api/players/${playerId}/performances`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch player performances');
+      }
+      return response.json();
+    },
+    enabled: !!playerId,
+  });
+
+  const performances: PlayerPerformance[] = performancesData?.performances || [];
+
   if (playerLoading) {
     return <PlayerProfileSkeleton />;
   }
@@ -78,13 +93,13 @@ export default function PlayerProfile() {
   }
 
   const careerStats = player.careerStats || {};
-  const battingAverage = careerStats.totalRuns && careerStats.totalMatches 
+  const battingAverage = careerStats.totalRuns && careerStats.totalMatches
     ? (careerStats.totalRuns / careerStats.totalMatches).toFixed(2)
     : '0.00';
-  const bowlingAverage = careerStats.totalWickets && careerStats.totalRunsGiven 
+  const bowlingAverage = careerStats.totalWickets && careerStats.totalRunsGiven
     ? (careerStats.totalRunsGiven / careerStats.totalWickets).toFixed(2)
     : '0.00';
-  const strikeRate = careerStats.totalRuns && careerStats.totalBallsFaced 
+  const strikeRate = careerStats.totalRuns && careerStats.totalBallsFaced
     ? ((careerStats.totalRuns / careerStats.totalBallsFaced) * 100).toFixed(2)
     : '0.00';
 
@@ -93,9 +108,9 @@ export default function PlayerProfile() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => navigate('/teams')}
             className="flex items-center gap-2"
             data-testid="button-back"
@@ -115,7 +130,7 @@ export default function PlayerProfile() {
                 {player.name.split(' ').map(n => n[0]).join('')}
               </AvatarFallback>
             </Avatar>
-            
+
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white" data-testid={`text-player-name-${player.id}`}>
@@ -127,7 +142,7 @@ export default function PlayerProfile() {
                   </Badge>
                 )}
               </div>
-              
+
               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
                 {player.role && (
                   <div className="flex items-center gap-1">
@@ -135,7 +150,7 @@ export default function PlayerProfile() {
                     <span className="capitalize">{player.role.replace('-', ' ')}</span>
                   </div>
                 )}
-                
+
                 {team && (
                   <div className="flex items-center gap-1">
                     <Trophy className="h-4 w-4" />
@@ -149,14 +164,14 @@ export default function PlayerProfile() {
                     </Button>
                   </div>
                 )}
-                
+
                 {player.battingStyle && (
                   <div className="flex items-center gap-1">
                     <BarChart3 className="h-4 w-4" />
                     <span className="capitalize">{player.battingStyle.replace('-', ' ')}</span>
                   </div>
                 )}
-                
+
                 {player.bowlingStyle && (
                   <div className="flex items-center gap-1">
                     <Target className="h-4 w-4" />
@@ -174,11 +189,10 @@ export default function PlayerProfile() {
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-full ${
-                player.userId 
-                  ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
-                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-              }`}>
+              <div className={`p-2 rounded-full ${player.userId
+                ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400'
+                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                }`}>
                 {player.userId ? (
                   <UserCheck className="h-5 w-5" />
                 ) : (
@@ -218,11 +232,11 @@ export default function PlayerProfile() {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
               {player.userId && (
-                <Badge 
-                  variant="default" 
+                <Badge
+                  variant="default"
                   className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                   data-testid="badge-linked"
                 >
@@ -231,8 +245,8 @@ export default function PlayerProfile() {
                 </Badge>
               )}
               {player.email && !player.userId && (
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className="text-orange-600 border-orange-300"
                   data-testid="badge-email-available"
                 >
@@ -241,8 +255,8 @@ export default function PlayerProfile() {
                 </Badge>
               )}
               {!player.email && !player.userId && (
-                <Badge 
-                  variant="secondary" 
+                <Badge
+                  variant="secondary"
                   className="text-gray-600"
                   data-testid="badge-not-linked"
                 >
@@ -252,7 +266,7 @@ export default function PlayerProfile() {
               )}
             </div>
           </div>
-          
+
           {player.email && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -275,27 +289,27 @@ export default function PlayerProfile() {
               <div className="text-2xl font-bold text-blue-600">{careerStats.totalMatches || 0}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Matches</div>
             </div>
-            
+
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{careerStats.matchesWon || 0}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Wins</div>
             </div>
-            
+
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">{careerStats.totalRuns || 0}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Runs</div>
             </div>
-            
+
             <div className="text-center">
               <div className="text-2xl font-bold text-red-600">{careerStats.totalWickets || 0}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Wickets</div>
             </div>
-            
+
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">{battingAverage}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Bat Avg</div>
             </div>
-            
+
             <div className="text-center">
               <div className="text-2xl font-bold text-yellow-600">{strikeRate}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Strike Rate</div>
@@ -383,8 +397,8 @@ export default function PlayerProfile() {
                   </div>
                   <div className="flex justify-between">
                     <span>Economy Rate:</span>
-                    <span className="font-semibold">{(careerStats.totalRunsGiven && careerStats.totalOvers 
-                      ? (careerStats.totalRunsGiven / careerStats.totalOvers).toFixed(2) 
+                    <span className="font-semibold">{(careerStats.totalRunsGiven && careerStats.totalOvers
+                      ? (careerStats.totalRunsGiven / careerStats.totalOvers).toFixed(2)
                       : '0.00')}
                     </span>
                   </div>
@@ -496,13 +510,17 @@ export default function PlayerProfile() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {playerMatches.map((match) => (
-                    <MatchCard 
-                      key={match.id} 
-                      match={match} 
-                      showActions={false}
-                    />
-                  ))}
+                  {playerMatches.map((match) => {
+                    const performance = performances.find(p => p.matchId === match.id);
+                    return (
+                      <MatchCard
+                        key={match.id}
+                        match={match}
+                        showActions={false}
+                        performance={performance}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -532,7 +550,7 @@ export default function PlayerProfile() {
                     </div>
                   </div>
                 )}
-                
+
                 {(careerStats.fiveWicketHauls || 0) > 0 && (
                   <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                     <Target className="h-6 w-6 text-red-600" />
@@ -546,7 +564,7 @@ export default function PlayerProfile() {
                     </div>
                   </div>
                 )}
-                
+
                 {(careerStats.manOfTheMatchAwards || 0) > 0 && (
                   <div className="flex items-center gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                     <Star className="h-6 w-6 text-yellow-600" />
@@ -560,7 +578,7 @@ export default function PlayerProfile() {
                     </div>
                   </div>
                 )}
-                
+
                 {careerStats.totalMatches && careerStats.totalMatches >= 50 && (
                   <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                     <Calendar className="h-6 w-6 text-blue-600" />
@@ -575,7 +593,7 @@ export default function PlayerProfile() {
                   </div>
                 )}
               </div>
-              
+
               {!(careerStats.centuries || careerStats.fiveWicketHauls || careerStats.manOfTheMatchAwards || (careerStats.totalMatches && careerStats.totalMatches >= 50)) && (
                 <div className="text-center py-8 text-gray-500">
                   <Star className="h-12 w-12 mx-auto mb-4 opacity-50" />

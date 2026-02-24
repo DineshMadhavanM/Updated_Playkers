@@ -125,11 +125,6 @@ export default function Profile() {
   });
 
 
-  const { data: performancesData } = useQuery<{ performances: PlayerPerformance[]; pagination: { limit: number; offset: number; count: number } }>({
-    queryKey: ["/api/user/performances"],
-    enabled: isAuthenticated,
-  });
-
   const { data: userVenues = [] } = useQuery<Venue[]>({
     queryKey: ["/api/user/venues"],
     enabled: isAuthenticated,
@@ -173,6 +168,19 @@ export default function Profile() {
     },
     enabled: !!user?.id,
     retry: false,
+  });
+
+  const { data: performancesData } = useQuery<{ performances: PlayerPerformance[]; pagination: { limit: number; offset: number; count: number } }>({
+    queryKey: linkedPlayer ? ["/api/players", linkedPlayer.id, "performances"] : ["/api/user/performances"],
+    queryFn: async () => {
+      const url = linkedPlayer
+        ? `/api/players/${linkedPlayer.id}/performances`
+        : `/api/user/performances`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch performances");
+      return response.json();
+    },
+    enabled: isAuthenticated,
   });
 
   const updateProfileMutation = useMutation({
@@ -896,9 +904,17 @@ export default function Profile() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {userMatches.map((match: Match) => (
-                  <MatchCard key={match.id} match={match} showActions={false} />
-                ))}
+                {userMatches.map((match: Match) => {
+                  const performance = performancesData?.performances?.find(p => p.matchId === match.id);
+                  return (
+                    <MatchCard
+                      key={match.id}
+                      match={match}
+                      showActions={false}
+                      performance={performance}
+                    />
+                  );
+                })}
               </div>
             )}
           </TabsContent>

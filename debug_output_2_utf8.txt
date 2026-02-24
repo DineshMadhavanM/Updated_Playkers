@@ -1,0 +1,17 @@
+﻿Γ£à Connected to MongoDB
+Γ£à Created playerPerformances indexes
+Γ£à Dropped old email-only index
+Γ£à Created players email+teamId compound index
+Γ£à Created users id unique index
+--- Deep Diagnostics for kit27.ad17@gmail.com / Dinesh Madhavan ---
+Matching Players: 2
+- ID: player-1758012123910-za7jkzolo, Email: kit27.ad17@gmail.com, Name: "Dinesh Madhavan ", userId: user-1757687394439-gjouvxuu8, Team: team-1758012088301-ca05z5x5i
+- ID: player-1762236108147-bidzrwwzn, Email: kit27.ad17@gmail.com, Name: "Dinesh Madhavan ", userId: null, Team: team-1761277252184-006rxmeku
+Recent performances found: 0
+Performances matching our playerIds in recent: 0
+Recent completed matches: 5
+- Match: Normal (match-1771919931113-yp4jlxm94), Updated: Tue Feb 24 2026 13:30:34 GMT+0530 (India Standard Time)
+- Match: Normal (match-1771919656631-1evsgbbhn), Updated: Tue Feb 24 2026 13:25:32 GMT+0530 (India Standard Time)
+- Match: Normal (match-1771919486751-d7kj7a4nw), Updated: Tue Feb 24 2026 13:23:22 GMT+0530 (India Standard Time)
+- Match: Normal (match-1771915074667-7p9kqtej1), Updated: Tue Feb 24 2026 12:10:43 GMT+0530 (India Standard Time)
+- Match: Normal (match-1771912378309-5ov2gdle0), Updated: Tue Feb 24 2026 11:25:02 GMT+0530 (India Standard Time)

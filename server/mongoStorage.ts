@@ -96,6 +96,7 @@ export class MongoStorage implements IStorage {
     try {
       await this.playerPerformances.createIndex({ playerId: 1 });
       await this.playerPerformances.createIndex({ matchId: 1 });
+      await this.playerPerformances.createIndex({ userId: 1 });
       await this.playerPerformances.createIndex(
         { matchId: 1, playerId: 1 },
         { unique: true }
@@ -964,6 +965,12 @@ export class MongoStorage implements IStorage {
       { $set: { userId: user.id, updatedAt: new Date() } }
     );
 
+    // Also link all past performance records for this player to the user
+    await this.db.collection('playerPerformances').updateMany(
+      { playerId: player.id } as any,
+      { $set: { userId: user.id, updatedAt: new Date() } }
+    );
+
     return { success: true, playerId: player.id, userId: user.id };
   }
 
@@ -1671,6 +1678,8 @@ export class MongoStorage implements IStorage {
     status: string;
     team1Id?: string;
     team2Id?: string;
+    team1Name?: string;
+    team2Name?: string;
     winnerTeamId?: string;
     scorecard?: any;
     awards?: any;
@@ -1683,6 +1692,7 @@ export class MongoStorage implements IStorage {
       fours?: number;
       sixes?: number;
       isOut?: boolean;
+      dismissalType?: string;
       oversBowled?: number;
       runsGiven?: number;
       wicketsTaken?: number;
@@ -1705,6 +1715,16 @@ export class MongoStorage implements IStorage {
       await session.withTransaction(async () => {
         console.log(`🔄 STORAGE: Starting atomic match completion transaction for ${matchData.matchId}`);
 
+        // Prepare player arrays for match history visibility
+        const team1Players = matchData.playerStats
+          .filter(p => p.teamId === matchData.team1Id)
+          .map(p => p.playerId);
+        const team2Players = matchData.playerStats
+          .filter(p => p.teamId === matchData.team2Id)
+          .map(p => p.playerId);
+
+        console.log(`📊 Participant counts: Team1: ${team1Players.length}, Team2: ${team2Players.length}`);
+
         // Update match status, scorecard, awards, resultSummary and mark as processed atomically
         // Enforce idempotency at database level - only update if not already processed
         const matchResult = await this.matches.findOneAndUpdate(
@@ -1718,14 +1738,14 @@ export class MongoStorage implements IStorage {
               'matchData.scorecard': matchData.scorecard,
               'matchData.awards': matchData.awards,
               'matchData.resultSummary': matchData.resultSummary,
+              'matchData.team1Players': team1Players,
+              'matchData.team2Players': team2Players,
               'matchData.processed': true, // Ensure idempotency
               updatedAt: new Date()
             }
           },
           { returnDocument: 'after', session }
         );
-
-        console.log(`✅ STORAGE: Match ${matchData.matchId} status updated and marked as processed`);
 
         if (matchResult) {
           updatedMatch = matchResult as Match;
@@ -1736,18 +1756,7 @@ export class MongoStorage implements IStorage {
           if (existingMatch && (existingMatch.matchData as any)?.processed === true) {
             console.log(`⚠️ STORAGE: Match ${matchData.matchId} already processed, returning existing`);
             updatedMatch = existingMatch as Match;
-            console.log(`⚠️ STORAGE: Skipping all processing for already processed match`);
-            // Return immediately with already processed flag
-            return {
-              success: true,
-              updatedMatch,
-              errors: ['Match already processed'],
-              cacheInvalidation: {
-                teams: [],
-                players: [],
-                matches: []
-              }
-            };
+            return; // Exit transaction block
           } else {
             throw new Error(`Match ${matchData.matchId} not found or concurrency conflict`);
           }
@@ -1899,6 +1908,61 @@ export class MongoStorage implements IStorage {
           const isWinner = playerStat.teamId === matchData.winnerTeamId;
           console.log(`🏃 STORAGE: Processing player ${playerStat.playerId} (Winner: ${isWinner})`);
 
+          // Record individual match performance
+          const performanceId = `perf-${this.generateId()}`;
+          const isTeam1 = playerStat.teamId === matchData.team1Id;
+          const oppositionName = isTeam1 ? matchData.team2Name : matchData.team1Name;
+          const teamName = isTeam1 ? matchData.team1Name : matchData.team2Name;
+
+          const performance: PlayerPerformance = {
+            id: performanceId,
+            playerId: playerStat.playerId,
+            userId: null, // Will be linked if possible
+            matchId: matchData.matchId,
+            teamId: playerStat.teamId || null,
+            teamName: teamName || null,
+            opposition: oppositionName || "Opposition",
+            venue: updatedMatch?.venueId || null,
+            matchDate: updatedMatch?.scheduledAt || new Date(),
+            matchFormat: updatedMatch?.matchType || null,
+            matchResult: matchData.winnerTeamId ? (isWinner ? 'won' : 'lost') : (matchData.resultSummary?.resultType === 'tied' ? 'tied' : 'no-result'),
+            battingStats: playerStat.runsScored !== undefined || playerStat.ballsFaced !== undefined ? {
+              runs: playerStat.runsScored || 0,
+              balls: playerStat.ballsFaced || 0,
+              fours: playerStat.fours || 0,
+              sixes: playerStat.sixes || 0,
+              strikeRate: playerStat.ballsFaced ? (playerStat.runsScored! / playerStat.ballsFaced) * 100 : 0,
+              position: 0,
+              isOut: playerStat.isOut || false,
+              dismissalType: playerStat.dismissalType || null,
+              bowlerOut: null,
+              fielderOut: null
+            } : null,
+            bowlingStats: playerStat.oversBowled !== undefined ? {
+              overs: playerStat.oversBowled || 0,
+              maidens: playerStat.maidens || 0,
+              runs: playerStat.runsGiven || 0,
+              wickets: playerStat.wicketsTaken || 0,
+              economy: playerStat.oversBowled ? playerStat.runsGiven! / playerStat.oversBowled : 0,
+              wides: 0,
+              noBalls: 0
+            } : null,
+            fieldingStats: {
+              catches: playerStat.catches || 0,
+              runOuts: playerStat.runOuts || 0,
+              stumpings: playerStat.stumpings || 0
+            },
+            awards: [],
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+
+          if (playerStat.manOfMatch) performance.awards.push('man-of-match');
+          if (playerStat.bestBatsman) performance.awards.push('best-batsman');
+          if (playerStat.bestBowler) performance.awards.push('best-bowler');
+          if (playerStat.bestFielder) performance.awards.push('best-fielder');
+
+          // Increment career stats
           const incrementFields: any = {
             'careerStats.totalMatches': 1
           };
@@ -1936,21 +2000,29 @@ export class MongoStorage implements IStorage {
 
           // Update highest score if needed
           const updateFields: any = { updatedAt: new Date() };
-          if (playerStat.runsScored) {
-            const currentPlayer = await this.getPlayer(playerStat.playerId);
-            if (currentPlayer && playerStat.runsScored > currentPlayer.careerStats.highestScore) {
+          // Fetch player details for career stats and userId
+          const currentPlayer = await this.players.findOne({ id: playerStat.playerId }, { session });
+          if (currentPlayer) {
+            if (playerStat.runsScored && playerStat.runsScored > (currentPlayer.careerStats?.highestScore || 0)) {
               updateFields['careerStats.highestScore'] = playerStat.runsScored;
+            }
+            if (currentPlayer.userId) {
+              performance.userId = currentPlayer.userId;
             }
           }
 
-          await this.players.updateOne(
-            { id: playerStat.playerId },
-            {
-              $inc: incrementFields,
-              $set: updateFields
-            },
-            { session }
-          );
+          // Insert performance and update player stats
+          await Promise.all([
+            this.db.collection('playerPerformances').insertOne(performance as any, { session }),
+            this.players.updateOne(
+              { id: playerStat.playerId },
+              {
+                $inc: incrementFields,
+                $set: updateFields
+              },
+              { session }
+            )
+          ]);
         }
       });
 

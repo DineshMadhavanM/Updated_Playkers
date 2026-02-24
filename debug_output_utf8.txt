@@ -1,0 +1,27 @@
+﻿Γ£à Connected to MongoDB
+Γ£à Created playerPerformances indexes
+Γ£à Dropped old email-only index
+Γ£à Created players email+teamId compound index
+Γ£à Created users id unique index
+Connected to storage
+Searching for email: kit27.ad17@gmail.com
+User: { id: 'user-1757687394439-gjouvxuu8', email: 'kit27.ad17@gmail.com' }
+Players found: 2
+- Player ID: player-1758012123910-za7jkzolo, TeamID: team-1758012088301-ca05z5x5i, Name: Dinesh Madhavan , userId: user-1757687394439-gjouvxuu8
+- Player ID: player-1762236108147-bidzrwwzn, TeamID: team-1761277252184-006rxmeku, Name: Dinesh Madhavan , userId: null
+Performances for userId user-1757687394439-gjouvxuu8: 0
+Performances for playerIds [player-1758012123910-za7jkzolo, player-1762236108147-bidzrwwzn]: 0
+Found similar players by 'kit27':
+- kit27.ad008@gmail.com (ID: player-1758012455218-ll67d482z)
+- kit27.ad08@gmail.com (ID: player-1758012202878-kovs9kx7z)
+- kit27.ad16@gmail.com (ID: player-1758012490888-3k6nnvzzs)
+- kit27.ad17@gmail.com (ID: player-1758012123910-za7jkzolo)
+- kit27.ad17@gmail.com (ID: player-1762236108147-bidzrwwzn)
+- kit27.ad303@gmail.com (ID: player-1758012343819-l5bo6k3d5)
+- kit27.ad36@gmail.com (ID: player-1758012371253-zkfqvhm8s)
+- kit27.ad47@gmail.com (ID: player-1758012429048-ygval1bib)
+- kit27.ad58@gmail.com (ID: player-1758012403666-ts6w73zhx)
+- kit27.ad60@gmail.com (ID: player-1758012241675-an5edf3uf)
+- kit27.ad61@gmail.com (ID: player-1758012169818-c4o2hk15f)
+- kit27.ad61@gmail.com (ID: player-1762237800375-j24j0o3pj)
+- kit27.ad63@gmail.com (ID: player-1758012294083-guvyfwuqf)

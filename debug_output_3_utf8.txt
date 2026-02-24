@@ -1,0 +1,77 @@
+﻿Γ£à Connected to MongoDB
+Γ£à Created playerPerformances indexes
+Γ£à Dropped old email-only index
+Γ£à Created players email+teamId compound index
+Γ£à Created users id unique index
+--- Collection Counts ---
+Users: 6
+Players: 28
+Matches: 15
+PlayerPerformances: 0
+
+--- Dinesh Madhavan Stats ---
+- ID: player-1758012123910-za7jkzolo, Email: kit27.ad17@gmail.com, Name: "Dinesh Madhavan ", userId: user-1757687394439-gjouvxuu8
+  Career Stats: {
+  "totalRuns": 163,
+  "totalBallsFaced": 49,
+  "totalFours": 15,
+  "totalSixes": 12,
+  "highestScore": 52,
+  "centuries": 0,
+  "halfCenturies": 2,
+  "battingAverage": 23.29,
+  "strikeRate": 332.65,
+  "totalOvers": 4,
+  "totalRunsGiven": 2,
+  "totalWickets": 4,
+  "totalMaidens": 0,
+  "bestBowlingFigures": null,
+  "fiveWicketHauls": 0,
+  "bowlingAverage": 0.5,
+  "economy": 0.5,
+  "catches": 0,
+  "runOuts": 0,
+  "stumpings": 0,
+  "totalMatches": 7,
+  "matchesWon": 0,
+  "manOfTheMatchAwards": 2,
+  "bestBatsmanAwards": 0,
+  "bestBowlerAwards": 0,
+  "bestFielderAwards": 0
+}
+- ID: player-1762236108147-bidzrwwzn, Email: kit27.ad17@gmail.com, Name: "Dinesh Madhavan ", userId: null
+  Career Stats: {
+  "totalRuns": 0,
+  "totalBallsFaced": 0,
+  "totalFours": 0,
+  "totalSixes": 0,
+  "highestScore": 0,
+  "centuries": 0,
+  "halfCenturies": 0,
+  "innings": 0,
+  "dismissals": 0,
+  "battingAverage": 0,
+  "strikeRate": 0,
+  "totalOvers": 0,
+  "totalRunsGiven": 0,
+  "totalWickets": 0,
+  "totalMaidens": 0,
+  "bestBowlingFigures": null,
+  "fiveWicketHauls": 0,
+  "bowlingAverage": 0,
+  "economy": 0,
+  "catches": 0,
+  "runOuts": 0,
+  "stumpings": 0,
+  "totalMatches": 0,
+  "matchesWon": 0,
+  "manOfTheMatchAwards": 0,
+  "bestBatsmanAwards": 0,
+  "bestBowlerAwards": 0,
+  "bestFielderAwards": 0
+}
+
+--- Recent Matches Scoring ---
+Match: Normal (match-1771919931113-yp4jlxm94)
+Scorecard participants sample:
+Unique playerIds in scorecard: player-1758012169818-c4o2hk15f, player-1762321522724-slilsvjbd, player-1758012578229-lz48365i0, player-1762321164415-cojyg0ll6, player-1762321143232-1j01nmyoz

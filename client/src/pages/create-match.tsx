@@ -90,6 +90,7 @@ export default function CreateMatch() {
       duration: 120,
       maxPlayers: 22,
       isPublic: true,
+      team1Name: "",
       team2Name: "",
       description: "",
       customOvers: "",
