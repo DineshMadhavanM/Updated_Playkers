@@ -527,7 +527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         message: "Failed to fetch matches",
         error: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        stack: error.stack
       });
     }
   });
