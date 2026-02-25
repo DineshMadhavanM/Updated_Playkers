@@ -56,7 +56,7 @@ export const insertMatchSchema = z.object({
   title: z.string(),
   sport: z.string(),
   matchType: z.string(),
-  region: z.string().nullable().optional(),
+  region: z.string().min(1, "Region is required"),
   isPublic: z.boolean().optional(),
   venueId: z.string(),
   organizerId: z.string(),

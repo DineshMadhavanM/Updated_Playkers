@@ -26,7 +26,6 @@ const matchSchema = z.object({
   sport: z.string().min(1, "Sport is required"),
   matchType: z.string().min(1, "Match type is required"),
   customOvers: z.string().optional(),
-  city: z.string().min(1, "City is required"),
   region: z.string().min(1, "Region is required"),
   scheduledAt: z.string().min(1, "Date and time is required"),
   duration: z.number().min(30, "Duration must be at least 30 minutes"),
@@ -97,7 +96,6 @@ export default function CreateMatch() {
       title: "",
       sport: "",
       matchType: "",
-      city: "",
       region: "",
       scheduledAt: "",
       duration: 120,
@@ -491,23 +489,6 @@ export default function CreateMatch() {
                     />
                   )}
 
-                  <FormField
-                    control={form.control}
-                    name="city"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>City</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="Mumbai"
-                            data-testid="input-city"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
 
                   <FormField
                     control={form.control}
