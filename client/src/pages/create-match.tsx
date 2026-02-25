@@ -27,6 +27,7 @@ const matchSchema = z.object({
   matchType: z.string().min(1, "Match type is required"),
   customOvers: z.string().optional(),
   city: z.string().min(1, "City is required"),
+  region: z.string().min(1, "Region is required"),
   scheduledAt: z.string().min(1, "Date and time is required"),
   duration: z.number().min(30, "Duration must be at least 30 minutes"),
   maxPlayers: z.number().min(2, "Must have at least 2 players"),
@@ -46,6 +47,17 @@ const sportOptions = [
   { value: "volleyball", label: "Volleyball", types: ["Best of 3", "Best of 5", "Time-based"] },
   { value: "tennis", label: "Tennis", types: ["Singles", "Doubles", "Mixed Doubles"] },
   { value: "kabaddi", label: "Kabaddi", types: ["Pro Kabaddi", "Circle Style", "Beach Kabaddi"] },
+];
+
+const regions = [
+  "Chennai",
+  "Coimbatore",
+  "Madurai",
+  "Trichy",
+  "Salem",
+  "Tirunelveli",
+  "Erode",
+  "Vellore"
 ];
 
 export default function CreateMatch() {
@@ -86,6 +98,7 @@ export default function CreateMatch() {
       sport: "",
       matchType: "",
       city: "",
+      region: "",
       scheduledAt: "",
       duration: 120,
       maxPlayers: 22,
@@ -491,6 +504,34 @@ export default function CreateMatch() {
                             data-testid="input-city"
                           />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="region"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Region</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-region">
+                              <SelectValue placeholder="Select region" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {regions.map((region) => (
+                              <SelectItem key={region} value={region}>
+                                {region}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
