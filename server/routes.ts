@@ -512,17 +512,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Match routes
   app.get('/api/matches', async (req, res) => {
+    console.log(`[DEBUG] GET /api/matches hit with query:`, req.query);
     try {
-      const { sport, status, isPublic } = req.query;
+      const { sport, status, isPublic, region } = req.query;
       const matches = await storage.getMatches({
         sport: sport as string,
         status: status as string,
-        isPublic: isPublic === 'true',
+        region: region as string,
+        isPublic: isPublic === 'true' ? true : (isPublic === 'false' ? false : undefined),
       });
       res.json(matches);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching matches:", error);
-      res.status(500).json({ message: "Failed to fetch matches" });
+      res.status(500).json({ message: "Failed to fetch matches", error: error.message });
     }
   });
 
