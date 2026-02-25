@@ -56,10 +56,10 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
 
   const getMatchResult = () => {
     if (match.status !== 'completed') return null;
-    
+
     const resultSummary = (match.matchData as any)?.resultSummary;
     const awards = (match.matchData as any)?.awards;
-    
+
     if (resultSummary?.winnerId) {
       const winnerName = resultSummary.winnerId === (match.matchData as any)?.team1Id ? match.team1Name : match.team2Name;
       if (resultSummary.resultType === 'won-by-runs') {
@@ -68,11 +68,11 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
         return `${winnerName} won by ${resultSummary.marginWickets} wickets`;
       }
     }
-    
+
     if (resultSummary?.resultType === 'tied') return 'Match tied';
     if (resultSummary?.resultType === 'no-result') return 'No result';
     if (resultSummary?.resultType === 'abandoned') return 'Match abandoned';
-    
+
     return 'Result not available';
   };
 
@@ -112,7 +112,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
   const getLiveMatchData = () => {
     const matchData = match.matchData as any;
     if (!matchData) return null;
-    
+
     return {
       currentInning: matchData.currentInning || 1,
       tossWinner: matchData.toss?.winner,
@@ -142,7 +142,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
     // Check all innings for batting performance
     [scorecard.team1Innings, scorecard.team2Innings].forEach((innings, teamIndex) => {
       const teamName = teamIndex === 0 ? (match.team1Name || 'Team 1') : (match.team2Name || 'Team 2');
-      
+
       if (innings && Array.isArray(innings)) {
         innings.forEach((inning: any) => {
           // Best batsman - highest runs
@@ -167,9 +167,9 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
               const economy = bowler.economy || 999;
               const overs = bowler.overs || 0;
               const runsGiven = bowler.runsGiven || 0;
-              
-              if (wickets > bestBowler.wickets || 
-                  (wickets === bestBowler.wickets && economy < bestBowler.economy)) {
+
+              if (wickets > bestBowler.wickets ||
+                (wickets === bestBowler.wickets && economy < bestBowler.economy)) {
                 bestBowler = {
                   playerId: bowler.playerId,
                   wickets,
@@ -188,7 +188,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
               if (batsman.dismissalType && batsman.dismissalType !== 'not-out' && batsman.fielder) {
                 const fielderId = batsman.fielder;
                 const dismissalType = batsman.dismissalType;
-                
+
                 // Count different types of fielding contributions
                 if (dismissalType === 'caught' || dismissalType === 'caught-behind') {
                   if (!bestFielder.playerId || fielderId === bestFielder.playerId) {
@@ -225,7 +225,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
 
   const renderInningsCard = (innings: any, teamName: string | null) => {
     if (!innings || innings.length === 0) return null;
-    
+
     return innings.map((inning: any, index: number) => (
       <Card key={index} className="mb-4">
         <CardHeader className="pb-4">
@@ -236,7 +236,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
             </Badge>
           </CardTitle>
           <div className="text-sm text-muted-foreground">
-            Run Rate: {inning.runRate?.toFixed(2)} | 
+            Run Rate: {inning.runRate?.toFixed(2)} |
             Extras: {Object.values(inning.extras || {}).reduce((a: any, b: any) => a + b, 0)}
           </div>
         </CardHeader>
@@ -246,7 +246,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
               <TabsTrigger value="batting">Batting</TabsTrigger>
               <TabsTrigger value="bowling">Bowling</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="batting" className="mt-4">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -279,7 +279,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                 </table>
               </div>
             </TabsContent>
-            
+
             <TabsContent value="bowling" className="mt-4">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -328,7 +328,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
             </Badge>
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {/* Match Info Header */}
           <Card>
@@ -348,7 +348,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                     {match.matchType} • {match.isPublic ? "Public" : "Private"}
                   </div>
                 </div>
-                
+
                 {match.team1Name && match.team2Name && (
                   <div className="text-center">
                     <div className="flex justify-between items-center">
@@ -369,7 +369,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                     )}
                   </div>
                 )}
-                
+
                 {getManOfTheMatch() && (
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-2 mb-2">
@@ -386,15 +386,44 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
           </Card>
 
           <Tabs defaultValue="scorecard" className="w-full">
-            <TabsList className="grid w-full grid-cols-3" data-testid={`dialog-tabs-list-${match.id}`}>
+            <TabsList className="grid w-full grid-cols-4" data-testid={`dialog-tabs-list-${match.id}`}>
               <TabsTrigger value="scorecard" data-testid={`tab-scorecard-${match.id}`}>Scorecard</TabsTrigger>
+              <TabsTrigger value="squads" data-testid={`tab-squads-${match.id}`}>Squads</TabsTrigger>
               <TabsTrigger value="awards" data-testid={`tab-awards-${match.id}`}>Awards</TabsTrigger>
               <TabsTrigger value="team-stats" data-testid={`tab-team-stats-${match.id}`}>Team Stats</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="scorecard" className="mt-6">
               {getScorecard() || match.status === 'live' ? (
                 <div className="space-y-6">
+                  {/* Match Overview Summary */}
+                  {match.status === 'completed' && (
+                    <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/10 dark:to-orange-900/10 border-yellow-200 dark:border-yellow-800">
+                      <CardContent className="pt-6">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                          <Trophy className="h-10 w-10 text-yellow-500" />
+                          <div>
+                            <h3 className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">{getMatchResult()}</h3>
+                            <p className="text-muted-foreground mt-1">Match completed on {formatDate(match.updatedAt || match.scheduledAt)}</p>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full max-w-md pt-4">
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Toss</p>
+                              <p className="font-semibold">{getLiveMatchData()?.tossWinner || 'N/A'}</p>
+                              <p className="text-xs text-muted-foreground">Chose to {getLiveMatchData()?.tossDecision}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Player of the Match</p>
+                              <p className="font-semibold">{getManOfTheMatch() || 'Not Announced'}</p>
+                              <p className="text-xs text-muted-foreground">Outstanding Performance</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {/* Current Live Score Display */}
                   {match.status === 'live' && (
                     <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
@@ -447,7 +476,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                     <>
                       {/* Team 1 Innings */}
                       {getScorecard().team1Innings && renderInningsCard(getScorecard().team1Innings, match.team1Name)}
-                      
+
                       {/* Team 2 Innings */}
                       {getScorecard().team2Innings && renderInningsCard(getScorecard().team2Innings, match.team2Name)}
                     </>
@@ -458,7 +487,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                   <CardContent className="py-12 text-center">
                     <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {match.status === 'upcoming' 
+                      {match.status === 'upcoming'
                         ? 'Match has not started yet. Scorecard will be available once the match begins.'
                         : 'No scorecard data available for this match'
                       }
@@ -474,7 +503,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                 </Card>
               )}
             </TabsContent>
-            
+
             <TabsContent value="awards" className="mt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card data-testid={`card-match-awards-${match.id}`}>
@@ -516,7 +545,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                       </div>
                     ) : (
                       <p className="text-muted-foreground text-center py-6">
-                        {match.status === 'completed' 
+                        {match.status === 'completed'
                           ? 'No awards data available for this match'
                           : 'Awards will be announced after match completion'
                         }
@@ -524,7 +553,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                     )}
                   </CardContent>
                 </Card>
-                
+
                 <Card data-testid={`card-match-result-${match.id}`}>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -555,7 +584,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                 </Card>
               </div>
             </TabsContent>
-            
+
             <TabsContent value="team-stats" className="mt-6">
               <div className="space-y-6">
                 {/* Match Performance Overview */}
@@ -687,105 +716,6 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                   </Card>
                 )}
 
-                {/* Top Performers */}
-                {match.status === 'completed' && getScorecard() && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Trophy className="h-5 w-5" />
-                        Top Performers
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {(() => {
-                        const topPerformers = getTopPerformers();
-                        if (!topPerformers) {
-                          return (
-                            <div className="text-center py-6 text-muted-foreground">
-                              No performance data available
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6" data-testid={`top-performers-grid-${match.id}`}>
-                            {/* Best Batsman */}
-                            <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" data-testid={`card-best-batsman-${match.id}`}>
-                              <CardContent className="p-4 text-center">
-                                <div className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2">🏏 Best Batsman</div>
-                                {topPerformers.bestBatsman ? (
-                                  <div>
-                                    <div className="font-bold text-lg text-green-600" data-testid={`best-batsman-name-${match.id}`}>
-                                      {getPlayerName(topPerformers.bestBatsman.playerId)}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">{topPerformers.bestBatsman.teamName}</div>
-                                    <div className="text-2xl font-bold text-green-600 mt-1" data-testid={`best-batsman-runs-${match.id}`}>
-                                      {topPerformers.bestBatsman.runs} runs
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {topPerformers.bestBatsman.ballsFaced} balls, SR: {topPerformers.bestBatsman.strikeRate.toFixed(1)}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="text-muted-foreground">No data</div>
-                                )}
-                              </CardContent>
-                            </Card>
-
-                            {/* Best Bowler */}
-                            <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800" data-testid={`card-best-bowler-${match.id}`}>
-                              <CardContent className="p-4 text-center">
-                                <div className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">⚡ Best Bowler</div>
-                                {topPerformers.bestBowler ? (
-                                  <div>
-                                    <div className="font-bold text-lg text-blue-600" data-testid={`best-bowler-name-${match.id}`}>
-                                      {getPlayerName(topPerformers.bestBowler.playerId)}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">{topPerformers.bestBowler.teamName}</div>
-                                    <div className="text-2xl font-bold text-blue-600 mt-1" data-testid={`best-bowler-wickets-${match.id}`}>
-                                      {topPerformers.bestBowler.wickets} wickets
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {topPerformers.bestBowler.overs} overs, {topPerformers.bestBowler.runsGiven} runs, Eco: {topPerformers.bestBowler.economy.toFixed(2)}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="text-muted-foreground">No data</div>
-                                )}
-                              </CardContent>
-                            </Card>
-
-                            {/* Best Fielder */}
-                            <Card className="bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800" data-testid={`card-best-fielder-${match.id}`}>
-                              <CardContent className="p-4 text-center">
-                                <div className="text-sm font-semibold text-orange-800 dark:text-orange-200 mb-2">🤲 Best Fielder</div>
-                                {topPerformers.bestFielder ? (
-                                  <div>
-                                    <div className="font-bold text-lg text-orange-600" data-testid={`best-fielder-name-${match.id}`}>
-                                      {getPlayerName(topPerformers.bestFielder.playerId)}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">{topPerformers.bestFielder.teamName}</div>
-                                    <div className="text-2xl font-bold text-orange-600 mt-1" data-testid={`best-fielder-contributions-${match.id}`}>
-                                      {topPerformers.bestFielder.catches + topPerformers.bestFielder.runOuts + topPerformers.bestFielder.stumpings} dismissals
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {topPerformers.bestFielder.catches > 0 && `${topPerformers.bestFielder.catches} catches`}
-                                      {topPerformers.bestFielder.runOuts > 0 && `, ${topPerformers.bestFielder.runOuts} run-outs`}
-                                      {topPerformers.bestFielder.stumpings > 0 && `, ${topPerformers.bestFielder.stumpings} stumpings`}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="text-muted-foreground">No data</div>
-                                )}
-                              </CardContent>
-                            </Card>
-                          </div>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
-                )}
-
                 {/* Match Timeline for Live/Completed matches */}
                 {(match.status === 'live' || match.status === 'completed') && (
                   <Card>
@@ -803,21 +733,21 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                             <span>{getLiveMatchData()?.tossWinner} (chose to {getLiveMatchData()?.tossDecision} first)</span>
                           </div>
                         )}
-                        
+
                         {match.status === 'live' && (
                           <>
                             <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                               <span className="font-medium">Current Status:</span>
                               <Badge variant="outline" className="bg-green-100 text-green-800">Live - Inning {getLiveMatchData()?.currentInning || 1}</Badge>
                             </div>
-                            
+
                             {getLiveMatchData()?.currentStriker && (
                               <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
                                 <span className="font-medium">On Strike:</span>
                                 <span>{getPlayerName(getLiveMatchData()?.currentStriker || "")}</span>
                               </div>
                             )}
-                            
+
                             {getLiveMatchData()?.currentBowler && (
                               <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
                                 <span className="font-medium">Bowling:</span>
@@ -826,7 +756,7 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                             )}
                           </>
                         )}
-                        
+
                         {match.status === 'completed' && (
                           <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                             <span className="font-medium">Final Result:</span>
@@ -835,6 +765,269 @@ export default function MatchScorecardDialog({ match, children, teamStats }: Mat
                         )}
                       </div>
                     </CardContent>
+                  </Card>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="squads" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Team 1 Roster */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      {match.team1Name || 'Team 1'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {(match.matchData as any)?.team1Roster?.map((player: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+                          <span className="font-medium">
+                            {player.name}
+                            {player.role && (player.role.includes('captain') || player.role.includes('wicket-keeper')) && (
+                              <span className="ml-2 text-xs font-bold text-slate-800 dark:text-slate-200 italic">
+                                {player.role === 'captain' && '(C)'}
+                                {player.role === 'vice-captain' && '(VC)'}
+                                {player.role === 'wicket-keeper' && '(WK)'}
+                                {player.role === 'captain-wicket-keeper' && '(C & WK)'}
+                                {player.role === 'vice-captain-wicket-keeper' && '(VC & WK)'}
+                              </span>
+                            )}
+                          </span>
+                          {player.battingStyle && (
+                            <Badge variant="outline" className="text-[10px] px-1 h-5">{player.battingStyle}</Badge>
+                          )}
+                        </div>
+                      ))}
+                      {!(match.matchData as any)?.team1Roster?.length && (
+                        <p className="text-muted-foreground text-center py-4">No squad data available for {match.team1Name}</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Team 2 Roster */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      {match.team2Name || 'Team 2'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {(match.matchData as any)?.team2Roster?.map((player: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+                          <span className="font-medium">
+                            {player.name}
+                            {player.role && (player.role.includes('captain') || player.role.includes('wicket-keeper')) && (
+                              <span className="ml-2 text-xs font-bold text-slate-800 dark:text-slate-200 italic">
+                                {player.role === 'captain' && '(C)'}
+                                {player.role === 'vice-captain' && '(VC)'}
+                                {player.role === 'wicket-keeper' && '(WK)'}
+                                {player.role === 'captain-wicket-keeper' && '(C & WK)'}
+                                {player.role === 'vice-captain-wicket-keeper' && '(VC & WK)'}
+                              </span>
+                            )}
+                          </span>
+                          {player.battingStyle && (
+                            <Badge variant="outline" className="text-[10px] px-1 h-5">{player.battingStyle}</Badge>
+                          )}
+                        </div>
+                      ))}
+                      {!(match.matchData as any)?.team2Roster?.length && (
+                        <p className="text-muted-foreground text-center py-4">No squad data available for {match.team2Name}</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="awards" className="mt-6">
+              <div className="space-y-6">
+                <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/10 dark:to-orange-900/10 border-yellow-200 dark:border-yellow-800">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Award className="h-5 w-5" />
+                      Match Awards & Highlights
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const topPerformers = getTopPerformers();
+                      if (!topPerformers) return <p className="text-muted-foreground text-center py-8">No performance awards available for this match.</p>;
+
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                          {/* Best Batsman */}
+                          <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-2 opacity-10"><TrendingUp className="h-12 w-12" /></div>
+                            <CardContent className="p-6 text-center">
+                              <div className="text-sm font-bold text-green-800 dark:text-green-200 mb-3 uppercase tracking-wider">🏏 Best Batsman</div>
+                              {topPerformers.bestBatsman ? (
+                                <div className="space-y-2">
+                                  <div className="font-black text-xl text-green-700 dark:text-green-400">
+                                    {getPlayerName(topPerformers.bestBatsman.playerId)}
+                                  </div>
+                                  <div className="text-sm font-medium text-muted-foreground">{topPerformers.bestBatsman.teamName}</div>
+                                  <div className="inline-block px-4 py-1.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-100 font-bold text-2xl mt-2">
+                                    {topPerformers.bestBatsman.runs} <span className="text-sm font-normal">runs</span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground pt-1">
+                                    {topPerformers.bestBatsman.ballsFaced} balls • SR: {topPerformers.bestBatsman.strikeRate.toFixed(1)}
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="text-muted-foreground py-4">No data</div>
+                              )}
+                            </CardContent>
+                          </Card>
+
+                          {/* Best Bowler */}
+                          <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-2 opacity-10"><Target className="h-12 w-12" /></div>
+                            <CardContent className="p-6 text-center">
+                              <div className="text-sm font-bold text-blue-800 dark:text-blue-200 mb-3 uppercase tracking-wider">⚡ Best Bowler</div>
+                              {topPerformers.bestBowler ? (
+                                <div className="space-y-2">
+                                  <div className="font-black text-xl text-blue-700 dark:text-blue-400">
+                                    {getPlayerName(topPerformers.bestBowler.playerId)}
+                                  </div>
+                                  <div className="text-sm font-medium text-muted-foreground">{topPerformers.bestBowler.teamName}</div>
+                                  <div className="inline-block px-4 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-100 font-bold text-2xl mt-2">
+                                    {topPerformers.bestBowler.wickets} <span className="text-sm font-normal">wickets</span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground pt-1">
+                                    {topPerformers.bestBowler.overs} ov • {topPerformers.bestBowler.runsGiven} runs • Eco: {topPerformers.bestBowler.economy.toFixed(2)}
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="text-muted-foreground py-4">No data</div>
+                              )}
+                            </CardContent>
+                          </Card>
+
+                          {/* Best Fielder */}
+                          <Card className="bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-2 opacity-10"><Activity className="h-12 w-12" /></div>
+                            <CardContent className="p-6 text-center">
+                              <div className="text-sm font-bold text-orange-800 dark:text-orange-200 mb-3 uppercase tracking-wider">🤲 Best Fielder</div>
+                              {topPerformers.bestFielder ? (
+                                <div className="space-y-2">
+                                  <div className="font-black text-xl text-orange-700 dark:text-orange-400">
+                                    {getPlayerName(topPerformers.bestFielder.playerId)}
+                                  </div>
+                                  <div className="text-sm font-medium text-muted-foreground">{topPerformers.bestFielder.teamName}</div>
+                                  <div className="inline-block px-4 py-1.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-100 font-bold text-2xl mt-2">
+                                    {topPerformers.bestFielder.catches + topPerformers.bestFielder.runOuts + topPerformers.bestFielder.stumpings} <span className="text-sm font-normal">dismissals</span>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground pt-1">
+                                    {topPerformers.bestFielder.catches > 0 && `${topPerformers.bestFielder.catches} C`}
+                                    {topPerformers.bestFielder.runOuts > 0 && `, ${topPerformers.bestFielder.runOuts} RO`}
+                                    {topPerformers.bestFielder.stumpings > 0 && `, ${topPerformers.bestFielder.stumpings} ST`}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-muted-foreground py-4">No data</div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </div>
+                      );
+                    })()}
+
+                    {getManOfTheMatch() && (
+                      <div className="mt-8 pt-8 border-t text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <Trophy className="h-12 w-12 text-yellow-500 animate-bounce" />
+                          <h4 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground">Main Award</h4>
+                          <p className="text-3xl font-black text-slate-900 dark:text-white">Player of the Match</p>
+                          <Badge className="text-2xl py-2 px-8 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 border-none shadow-lg mt-2">
+                            {getManOfTheMatch()}
+                          </Badge>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="team-stats" className="mt-6">
+              <div className="space-y-6">
+                {teamStats ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg font-bold">Team Performance Comparison</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4 pt-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">Tournament Points</span>
+                            <Badge variant="secondary" className="text-lg font-bold">{teamStats.tournamentPoints}</Badge>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              <span>Win Rate</span>
+                              <span>{teamStats.winRate}%</span>
+                            </div>
+                            <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-green-500 transition-all duration-1000"
+                                style={{ width: `${teamStats.winRate}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-center pt-2">
+                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                              <p className="text-xs text-green-700 dark:text-green-300 font-bold uppercase">Won</p>
+                              <p className="text-xl font-bold">{teamStats.matchesWon}</p>
+                            </div>
+                            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                              <p className="text-xs text-red-700 dark:text-red-300 font-bold uppercase">Lost</p>
+                              <p className="text-xl font-bold">{teamStats.matchesLost}</p>
+                            </div>
+                            <div className="p-3 bg-slate-50 dark:bg-slate-900/20 rounded-lg">
+                              <p className="text-xs text-slate-700 dark:text-slate-300 font-bold uppercase">Drawn</p>
+                              <p className="text-xl font-bold">{teamStats.matchesDrawn}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg font-bold">Match Summary Stats</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="p-4 bg-muted/30 rounded-lg border border-dashed flex flex-col items-center justify-center min-h-[160px] text-center">
+                          <Users className="h-10 w-10 text-muted-foreground mb-3" />
+                          <p className="font-bold text-lg mb-1">{teamStats.totalMatches} matches played</p>
+                          <p className="text-sm text-muted-foreground">Stats from current tournament season</p>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-100">
+                          <Trophy className="h-5 w-5 text-yellow-600" />
+                          <span className="text-sm font-medium">Potential for Championship!</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ) : (
+                  <Card className="p-12 text-center border-dashed">
+                    <CardHeader>
+                      <div className="flex justify-center mb-4">
+                        <Activity className="h-12 w-12 text-muted-foreground opacity-30" />
+                      </div>
+                      <CardTitle className="text-xl text-muted-foreground">Team Statistics Unavailable</CardTitle>
+                      <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                        Historical team statistics are not available for this specific match. Data collection starts after match finalization.
+                      </p>
+                    </CardHeader>
                   </Card>
                 )}
               </div>

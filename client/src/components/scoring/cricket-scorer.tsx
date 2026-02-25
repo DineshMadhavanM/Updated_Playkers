@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Trophy, Award, Users, Info, Activity } from "lucide-react";
 import type { Match } from "@shared/schema";
 
 interface CricketScorerProps {
@@ -350,6 +352,11 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
 
         if (matchData.battingStats) setBattingStats(matchData.battingStats);
         if (matchData.bowlingStats) setBowlingStats(matchData.bowlingStats);
+        if (matchData.inningsData) setInningsData(matchData.inningsData);
+        if (matchData.matchResult) setMatchResult(matchData.matchResult);
+        if (matchData.isMatchCompleted) setIsMatchCompleted(matchData.isMatchCompleted);
+        if (matchData.manOfMatchSelected) setManOfMatchSelected(matchData.manOfMatchSelected);
+        if (matchData.selectedManOfMatch) setSelectedManOfMatch(matchData.selectedManOfMatch);
       }
     }
   }, [isLive, match]);
@@ -766,6 +773,9 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
         setMatchResult(result);
         setIsMatchCompleted(true);
 
+        // Capture second innings data
+        captureInningsData(2);
+
         // Update final score before showing dialog
         updateScore({
           team1Runs: newTeam1Runs,
@@ -997,6 +1007,9 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
         setMatchResult(result);
         setIsMatchCompleted(true);
         // setShowManOfMatchDialog(true); // Let user choose to open this
+
+        // Capture second innings data
+        captureInningsData(2);
 
         // Update final score
         updateScore({
@@ -1373,6 +1386,9 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
         setIsMatchCompleted(true);
         // setShowManOfMatchDialog(true); // Let user choose to open this
 
+        // Capture second innings data
+        captureInningsData(2);
+
         updateScore({
           team1Runs: newTeam1Runs,
           team2Runs: newTeam2Runs,
@@ -1552,6 +1568,9 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
       // Complete the match immediately - don't auto-open Man of the Match dialog
       setIsMatchCompleted(true);
       // setShowManOfMatchDialog(true); // Let user choose to open this
+
+      // Capture second innings data
+      captureInningsData(2);
 
       toast({
         title: "Match Complete!",
@@ -4094,96 +4113,262 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
       {/* Match Result Display */}
       {
         isMatchCompleted && matchResult && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md mx-4 bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 border-2 border-yellow-300 dark:border-yellow-700">
-              <CardHeader className="text-center">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 border-2 border-yellow-300 dark:border-yellow-700">
+              <CardHeader className="text-center pb-2">
                 <CardTitle className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">
                   🏆 Match Complete!
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="text-center space-y-4">
-                <p className="text-xl font-semibold text-gray-800 dark:text-gray-200">
+                <p className="text-xl font-semibold text-gray-800 dark:text-gray-200 mt-2">
                   {matchResult}
                 </p>
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Final Scores:</p>
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                      <p className="font-semibold">{match.team1Name || 'Team A'}</p>
-                      <p className="text-lg">{team1Runs}/{team1Wickets}</p>
-                      <p className="text-xs text-gray-500">({Math.floor(team1Balls / 6)}.{team1Balls % 6} overs)</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold">{match.team2Name || 'Team B'}</p>
-                      <p className="text-lg">{team2Runs}/{team2Wickets}</p>
-                      <p className="text-xs text-gray-500">({Math.floor(team2Balls / 6)}.{team2Balls % 6} overs)</p>
-                    </div>
-                  </div>
-                </div>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-y-auto px-6 py-4">
+                <Tabs defaultValue="overview" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 mb-6">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="scorecard">Scorecard</TabsTrigger>
+                    <TabsTrigger value="squads">Squads</TabsTrigger>
+                  </TabsList>
 
-                {/* Man of the Match Display or Selection Button */}
-                {manOfMatchSelected && selectedManOfMatch ? (
-                  <div className="bg-gradient-to-r from-yellow-100 to-orange-100 dark:from-yellow-900/30 dark:to-orange-900/30 p-4 rounded-lg border-2 border-yellow-400 dark:border-yellow-600">
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-yellow-800 dark:text-yellow-200 mb-1">
-                        🏆 Man of the Match
-                      </p>
-                      <p className="text-xl font-extrabold text-orange-700 dark:text-orange-300">
-                        {selectedManOfMatch}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <Button
-                    onClick={() => setShowManOfMatchDialog(true)}
-                    variant="outline"
-                    className="w-full border-yellow-300 dark:border-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
-                    data-testid="button-select-man-of-match"
-                  >
-                    🏆 Select Man of the Match (Optional)
-                  </Button>
-                )}
+                  <TabsContent value="overview" className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Card className="bg-white/80 dark:bg-gray-800/80">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Info className="h-4 w-4" />
+                            Final Scores
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-2 gap-4 text-center">
+                            <div>
+                              <p className="font-semibold">{match.team1Name || 'Team A'}</p>
+                              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{team1Runs}/{team1Wickets}</p>
+                              <p className="text-xs text-muted-foreground">({Math.floor(team1Balls / 6)}.{team1Balls % 6} ov)</p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">{match.team2Name || 'Team B'}</p>
+                              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{team2Runs}/{team2Wickets}</p>
+                              <p className="text-xs text-muted-foreground">({Math.floor(team2Balls / 6)}.{team2Balls % 6} ov)</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-                <div className="flex flex-col gap-3">
-                  <div className="flex gap-3">
-                    {!isMatchSaved && (
+                      {manOfMatchSelected && selectedManOfMatch && (
+                        <Card className="bg-gradient-to-r from-yellow-400/10 to-orange-400/10 border-yellow-400/30">
+                          <CardHeader className="pb-2 text-center">
+                            <CardTitle className="text-sm font-bold text-yellow-800 dark:text-yellow-200 uppercase tracking-wider">
+                              🏆 Man of the Match
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="text-center">
+                            <p className="text-2xl font-black text-orange-700 dark:text-orange-400 drop-shadow-sm">
+                              {selectedManOfMatch}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">Outstanding Achievement</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+
+                    {!manOfMatchSelected && (
                       <Button
-                        onClick={handleSaveMatch}
-                        disabled={isSavingMatch}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                        data-testid="button-save-match"
+                        onClick={() => setShowManOfMatchDialog(true)}
+                        variant="outline"
+                        className="w-full border-yellow-400/50 hover:bg-yellow-400/10"
+                        data-testid="button-select-man-of-match-main"
                       >
-                        {isSavingMatch ? "Saving..." : "💾 Save Match"}
+                        🏆 Select Man of the Match
                       </Button>
                     )}
-                    {!isPlayerProfilesSaved && (
-                      <Button
-                        onClick={handleSavePlayerProfiles}
-                        disabled={isSavingPlayerProfiles}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                        data-testid="button-save-player-profiles"
-                      >
-                        {isSavingPlayerProfiles ? "Saving..." : "👤 Save Player Profiles"}
-                      </Button>
-                    )}
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setIsMatchCompleted(false);
-                      setMatchResult(null);
-                      setSelectedManOfMatch('');
-                      setManOfMatchSelected(false);
-                      setIsMatchSaved(false);
-                      setIsPlayerProfilesSaved(false);
-                    }}
-                    className="w-full"
-                    variant={(isMatchSaved || isPlayerProfilesSaved) ? "default" : "outline"}
-                    data-testid="button-close-result"
-                  >
-                    Close
-                  </Button>
-                </div>
+                  </TabsContent>
+
+                  <TabsContent value="scorecard" className="space-y-6">
+                    {/* Full Scorecard View */}
+                    <div className="space-y-8 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                      {inningsData.sort((a, b) => a.inningNumber - b.inningNumber).map((inning, idx) => (
+                        <div key={idx} className="space-y-4">
+                          <div className="flex items-center justify-between border-b pb-2 sticky top-0 bg-white/95 dark:bg-gray-900/95 z-10">
+                            <h4 className="font-bold text-lg flex items-center gap-2">
+                              <Activity className="h-5 w-5 text-primary" />
+                              {inning.battingTeam} - Innings {inning.inningNumber}
+                            </h4>
+                            <Badge variant="secondary" className="text-sm font-bold">
+                              {inning.score.runs}/{inning.score.wickets} ({inning.score.overs} ov)
+                            </Badge>
+                          </div>
+
+                          {/* Batting Table */}
+                          <div className="rounded-lg border overflow-hidden">
+                            <Table>
+                              <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                  <TableHead className="w-[40%]">Batter</TableHead>
+                                  <TableHead className="text-right">R</TableHead>
+                                  <TableHead className="text-right">B</TableHead>
+                                  <TableHead className="text-right">4s</TableHead>
+                                  <TableHead className="text-right">6s</TableHead>
+                                  <TableHead className="text-right">SR</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {inning.batsmen.map((b, i) => (
+                                  <TableRow key={i} className={b.isDismissed ? "bg-muted/20" : ""}>
+                                    <TableCell className="font-medium">
+                                      {b.name}
+                                      {b.isDismissed && <span className="ml-1 text-[10px] text-muted-foreground italic">({b.dismissalType || 'out'})</span>}
+                                    </TableCell>
+                                    <TableCell className="text-right font-bold">{b.runs}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">{b.balls}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">{b.fours}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">{b.sixes}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">{b.strikeRate.toFixed(1)}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+
+                          {/* Bowling Table */}
+                          <div className="rounded-lg border overflow-hidden">
+                            <Table>
+                              <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                  <TableHead className="w-[40%]">Bowler</TableHead>
+                                  <TableHead className="text-right">O</TableHead>
+                                  <TableHead className="text-right">M</TableHead>
+                                  <TableHead className="text-right">R</TableHead>
+                                  <TableHead className="text-right">W</TableHead>
+                                  <TableHead className="text-right">Eco</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {inning.bowlers.map((bw, i) => (
+                                  <TableRow key={i}>
+                                    <TableCell className="font-medium">{bw.name}</TableCell>
+                                    <TableCell className="text-right font-bold">{bw.oversBowled}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">{bw.maidenOvers}</TableCell>
+                                    <TableCell className="text-right font-bold text-blue-600 dark:text-blue-400">{bw.runsConceded}</TableCell>
+                                    <TableCell className="text-right font-bold text-red-600 dark:text-red-400">{bw.wickets}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">{bw.economyRate.toFixed(2)}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      ))}
+                      {inningsData.length === 0 && (
+                        <div className="text-center py-12 text-muted-foreground">
+                          No innings data available yet.
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="squads" className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Team 1 Squad */}
+                      <Card className="bg-white/50 dark:bg-gray-800/50">
+                        <CardHeader className="py-3 bg-muted/20">
+                          <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <Users className="h-4 w-4" /> {match.team1Name || 'Team A'}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4 px-3">
+                          <div className="grid grid-cols-1 gap-1">
+                            {rosterPlayers.filter(p => p.team === 'team1').map((p, i) => (
+                              <div key={i} className="text-xs flex justify-between p-1.5 rounded hover:bg-muted/30 transition-colors">
+                                <p className="font-medium">
+                                  {p.name}
+                                  {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
+                                    <span className="ml-1 text-[10px] text-primary font-bold uppercase">
+                                      {p.role === 'captain' && '(C)'}
+                                      {p.role === 'wicket-keeper' && '(WK)'}
+                                      {p.role === 'captain-wicket-keeper' && '(C & WK)'}
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-muted-foreground uppercase">{p.role === 'player' ? '' : p.role}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Team 2 Squad */}
+                      <Card className="bg-white/50 dark:bg-gray-800/50">
+                        <CardHeader className="py-3 bg-muted/20">
+                          <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <Users className="h-4 w-4" /> {match.team2Name || 'Team B'}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4 px-3">
+                          <div className="grid grid-cols-1 gap-1">
+                            {rosterPlayers.filter(p => p.team === 'team2').map((p, i) => (
+                              <div key={i} className="text-xs flex justify-between p-1.5 rounded hover:bg-muted/30 transition-colors">
+                                <p className="font-medium">
+                                  {p.name}
+                                  {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
+                                    <span className="ml-1 text-[10px] text-primary font-bold uppercase">
+                                      {p.role === 'captain' && '(C)'}
+                                      {p.role === 'wicket-keeper' && '(WK)'}
+                                      {p.role === 'captain-wicket-keeper' && '(C & WK)'}
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-muted-foreground uppercase">{p.role === 'player' ? '' : p.role}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
+
+              <div className="p-6 pt-0 space-y-3">
+                <div className="flex gap-3">
+                  {!isMatchSaved && (
+                    <Button
+                      onClick={handleSaveMatch}
+                      disabled={isSavingMatch}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold"
+                      data-testid="button-save-match"
+                    >
+                      {isSavingMatch ? "Saving..." : "💾 Save Match"}
+                    </Button>
+                  )}
+                  {!isPlayerProfilesSaved && (
+                    <Button
+                      onClick={handleSavePlayerProfiles}
+                      disabled={isSavingPlayerProfiles}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                      data-testid="button-save-player-profiles"
+                    >
+                      {isSavingPlayerProfiles ? "Saving..." : "👤 Save Player Profiles"}
+                    </Button>
+                  )}
+                </div>
+                <Button
+                  onClick={() => {
+                    setIsMatchCompleted(false);
+                    setMatchResult(null);
+                    setSelectedManOfMatch('');
+                    setManOfMatchSelected(false);
+                    setIsMatchSaved(false);
+                    setIsPlayerProfilesSaved(false);
+                  }}
+                  className="w-full"
+                  variant={(isMatchSaved || isPlayerProfilesSaved) ? "default" : "outline"}
+                  data-testid="button-close-result"
+                >
+                  Close & Continue
+                </Button>
+              </div>
             </Card>
           </div>
         )

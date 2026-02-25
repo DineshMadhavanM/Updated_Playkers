@@ -10,11 +10,13 @@ import KabaddiScorer from "@/components/scoring/kabaddi-scorer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useSocket } from "@/hooks/useSocket";
 import { queryClient } from "@/lib/queryClient";
-import { Calendar, MapPin, Users, Eye, RefreshCw, ArrowLeft } from "lucide-react";
+import { Calendar, MapPin, Users, Eye, RefreshCw, ArrowLeft, Trophy, Award, Activity, Info, Timer, TrendingUp, Target } from "lucide-react";
 import { Link } from "wouter";
 import type { Match, MatchParticipant } from "@shared/schema";
 
@@ -301,18 +303,285 @@ export default function MatchSpectator() {
         )}
 
         {match.status === 'completed' && (
-          <Card className="mb-6 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-            <CardContent className="p-6">
-              <div className="text-center">
-                <p className="font-semibold text-green-900 dark:text-green-100 text-lg mb-2">
-                  Match Completed
-                </p>
-                <p className="text-green-700 dark:text-green-300">
-                  Final score is displayed below
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-6 mb-8">
+            {/* Main Result Card */}
+            <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 dark:border-green-800 dark:from-green-950 dark:to-emerald-950">
+              <CardContent className="p-8">
+                <div className="text-center space-y-4">
+                  <Trophy className="h-12 w-12 text-yellow-500 mx-auto animate-bounce" />
+                  <div>
+                    <h2 className="text-3xl font-black text-green-900 dark:text-green-100 uppercase tracking-tight">
+                      {match.matchData?.matchResult || 'Match Completed'}
+                    </h2>
+                    <p className="text-green-700 dark:text-green-400 font-medium mt-1">
+                      Final Score: {match.team1Score?.runs}/{match.team1Score?.wickets} vs {match.team2Score?.runs}/{match.team2Score?.wickets}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Detailed Results Tabs */}
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="grid w-full grid-cols-4 lg:w-[600px] mx-auto mb-8 bg-muted/50 p-1">
+                <TabsTrigger value="overview" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Overview</TabsTrigger>
+                <TabsTrigger value="scorecard" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Scorecard</TabsTrigger>
+                <TabsTrigger value="squads" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Squads</TabsTrigger>
+                <TabsTrigger value="awards" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Awards</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview" className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Match Info Card */}
+                  <Card className="shadow-md hover:shadow-lg transition-shadow">
+                    <CardHeader className="bg-muted/30 pb-3">
+                      <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground uppercase tracking-widest">
+                        <Info className="h-4 w-4" /> Match Info
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      <div className="space-y-3 text-sm">
+                        <div className="flex justify-between border-b pb-2">
+                          <span className="text-muted-foreground">Toss</span>
+                          <span className="font-semibold text-right">{match.matchData?.tossWinner ? `${match.matchData.tossWinner} won & chose to ${match.matchData.tossDecision}` : 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between border-b pb-2">
+                          <span className="text-muted-foreground">Venue</span>
+                          <span className="font-semibold text-right">{match.venueId}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Format</span>
+                          <span className="font-semibold text-right">{match.matchType}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Final Score Summary */}
+                  <Card className="lg:col-span-2 shadow-md hover:shadow-lg transition-shadow">
+                    <CardHeader className="bg-muted/30 pb-3">
+                      <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground uppercase tracking-widest">
+                        <Activity className="h-4 w-4" /> Final Scores
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                      <div className="grid grid-cols-2 gap-8 text-center relative">
+                        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-border hidden md:block"></div>
+                        <div className="space-y-2">
+                          <p className="text-lg font-bold text-primary">{match.team1Name || 'Team 1'}</p>
+                          <div className="text-3xl font-black">{match.team1Score?.runs}/{match.team1Score?.wickets}</div>
+                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest">({match.team1Score?.overs} overs)</p>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-lg font-bold text-primary">{match.team2Name || 'Team 2'}</p>
+                          <div className="text-3xl font-black">{match.team2Score?.runs}/{match.team2Score?.wickets}</div>
+                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest">({match.team2Score?.overs} overs)</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="scorecard" className="space-y-8">
+                {match.matchData?.inningsData ? (
+                  match.matchData.inningsData.sort((a: any, b: any) => a.inningNumber - b.inningNumber).map((inning: any, idx: number) => (
+                    <Card key={idx} className="shadow-md overflow-hidden">
+                      <CardHeader className="bg-muted/30 border-b py-4">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-xl font-bold flex items-center gap-2">
+                            <Activity className="h-5 w-5 text-primary" />
+                            {inning.battingTeam} - Innings {inning.inningNumber}
+                          </CardTitle>
+                          <Badge variant="secondary" className="px-4 py-1 text-base font-black bg-primary/10 text-primary border-primary/20">
+                            {inning.score.runs}/{inning.score.wickets} <span className="text-sm font-normal ml-1 opacity-70">({inning.score.overs} ov)</span>
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {/* Batting Table */}
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader className="bg-muted/50">
+                              <TableRow>
+                                <TableHead className="pl-6 w-[40%] font-bold text-xs uppercase tracking-widest">Batter</TableHead>
+                                <TableHead className="text-right font-bold text-xs uppercase tracking-widest">R</TableHead>
+                                <TableHead className="text-right font-bold text-xs uppercase tracking-widest">B</TableHead>
+                                <TableHead className="text-right font-bold text-xs uppercase tracking-widest">4s</TableHead>
+                                <TableHead className="text-right font-bold text-xs uppercase tracking-widest">6s</TableHead>
+                                <TableHead className="text-right pr-6 font-bold text-xs uppercase tracking-widest">SR</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {inning.batsmen.map((b: any, i: number) => (
+                                <TableRow key={i} className={b.isDismissed ? "bg-muted/10 opacity-80" : "hover:bg-muted/5 transition-colors"}>
+                                  <TableCell className="pl-6 font-bold text-slate-900 dark:text-slate-100">
+                                    {b.name}
+                                    {b.isDismissed && <span className="ml-2 text-[10px] text-muted-foreground font-medium border rounded px-1.5 py-0.5 uppercase tracking-tighter decoration-slate-400">{b.dismissalType || 'out'}</span>}
+                                  </TableCell>
+                                  <TableCell className="text-right font-black text-slate-900 dark:text-slate-100">{b.runs}</TableCell>
+                                  <TableCell className="text-right text-muted-foreground font-medium">{b.balls}</TableCell>
+                                  <TableCell className="text-right text-muted-foreground">{b.fours}</TableCell>
+                                  <TableCell className="text-right text-muted-foreground">{b.sixes}</TableCell>
+                                  <TableCell className="text-right pr-6 font-bold text-blue-600 dark:text-blue-400">{b.strikeRate.toFixed(1)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        {/* Bowling Table */}
+                        <div className="overflow-x-auto border-t">
+                          <Table>
+                            <TableHeader className="bg-muted/50">
+                              <TableRow>
+                                <TableHead className="pl-6 w-[40%] font-bold text-xs uppercase tracking-widest">Bowler</TableHead>
+                                <TableHead className="text-right font-bold text-xs uppercase tracking-widest">O</TableHead>
+                                <TableHead className="text-right font-bold text-xs uppercase tracking-widest">M</TableHead>
+                                <TableHead className="text-right font-bold text-xs uppercase tracking-widest">R</TableHead>
+                                <TableHead className="text-right font-bold text-xs uppercase tracking-widest">W</TableHead>
+                                <TableHead className="text-right pr-6 font-bold text-xs uppercase tracking-widest">Eco</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {inning.bowlers.map((bw: any, i: number) => (
+                                <TableRow key={i} className="hover:bg-muted/5 transition-colors">
+                                  <TableCell className="pl-6 font-bold text-slate-900 dark:text-slate-100">{bw.name}</TableCell>
+                                  <TableCell className="text-right font-black">{bw.oversBowled}</TableCell>
+                                  <TableCell className="text-right text-muted-foreground">{bw.maidenOvers}</TableCell>
+                                  <TableCell className="text-right font-bold text-blue-600 dark:text-blue-400">{bw.runsConceded}</TableCell>
+                                  <TableCell className="text-right font-black text-red-600 dark:text-red-400">{bw.wickets}</TableCell>
+                                  <TableCell className="text-right pr-6 text-muted-foreground font-medium">{bw.economyRate.toFixed(2)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <Card className="p-12 text-center border-dashed">
+                    <CardContent>
+                      <Info className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+                      <p className="text-muted-foreground font-medium">Detailed scorecard data is not available for this match.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="squads" className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Team 1 Squad */}
+                  <Card className="shadow-md overflow-hidden">
+                    <CardHeader className="bg-primary/5 border-b py-4">
+                      <CardTitle className="text-lg font-black flex items-center gap-2 uppercase tracking-wide">
+                        <Users className="h-5 w-5 text-primary" /> {match.team1Name || 'Team 1'}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6 px-4">
+                      <div className="grid grid-cols-1 gap-2">
+                        {(match.sport === 'cricket' && rosterPlayers.length > 0 ?
+                          rosterPlayers.filter(p => p.team === 'team1') :
+                          participants.filter(p => p.team === 'team1')
+                        ).map((p: any, i: number) => (
+                          <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-muted-foreground/10">
+                            <p className="font-bold text-slate-900 dark:text-slate-100">
+                              {p.playerName || p.name || p.userId}
+                              {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
+                                <span className="ml-2 text-[10px] font-black text-primary border border-primary/30 rounded px-1.5 py-0.5 uppercase tracking-tighter bg-primary/5">
+                                  {p.role === 'captain' && 'C'}
+                                  {p.role === 'wicket-keeper' && 'WK'}
+                                  {p.role === 'captain-wicket-keeper' && 'C & WK'}
+                                </span>
+                              )}
+                            </p>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{p.role === 'player' ? '' : p.role}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Team 2 Squad */}
+                  <Card className="shadow-md overflow-hidden">
+                    <CardHeader className="bg-primary/5 border-b py-4">
+                      <CardTitle className="text-lg font-black flex items-center gap-2 uppercase tracking-wide">
+                        <Users className="h-5 w-5 text-primary" /> {match.team2Name || 'Team 2'}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6 px-4">
+                      <div className="grid grid-cols-1 gap-2">
+                        {(match.sport === 'cricket' && rosterPlayers.length > 0 ?
+                          rosterPlayers.filter(p => p.team === 'team2') :
+                          participants.filter(p => p.team === 'team2')
+                        ).map((p: any, i: number) => (
+                          <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-muted-foreground/10">
+                            <p className="font-bold text-slate-900 dark:text-slate-100">
+                              {p.playerName || p.name || p.userId}
+                              {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
+                                <span className="ml-2 text-[10px] font-black text-primary border border-primary/30 rounded px-1.5 py-0.5 uppercase tracking-tighter bg-primary/5">
+                                  {p.role === 'captain' && 'C'}
+                                  {p.role === 'wicket-keeper' && 'WK'}
+                                  {p.role === 'captain-wicket-keeper' && 'C & WK'}
+                                </span>
+                              )}
+                            </p>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{p.role === 'player' ? '' : p.role}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="awards" className="space-y-6">
+                <div className="max-w-4xl mx-auto space-y-8">
+                  {/* TOP HIGHLIGHTS */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* POM Card */}
+                    <Card className="md:col-span-3 bg-gradient-to-r from-yellow-400/10 via-orange-400/10 to-yellow-400/10 border-yellow-400/30 overflow-hidden relative group">
+                      <div className="absolute inset-0 bg-white/5 dark:bg-black/5 animate-pulse group-hover:animate-none"></div>
+                      <CardContent className="p-8 text-center relative z-10">
+                        <Trophy className="h-16 w-16 text-yellow-500 mx-auto mb-4 drop-shadow-lg" />
+                        <h3 className="text-sm font-black text-yellow-800 dark:text-yellow-200 uppercase tracking-[0.4em] mb-4">Player of the Match</h3>
+                        <div className="text-4xl lg:text-5xl font-black text-slate-900 dark:text-white drop-shadow-sm mb-2">
+                          {match.matchData?.selectedManOfMatch || 'Not Announced'}
+                        </div>
+                        <p className="text-muted-foreground font-medium italic">Outstanding Performance for the Team</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Stats Highlights */}
+                    <Card className="bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 hover:shadow-md transition-shadow">
+                      <CardContent className="p-6 text-center">
+                        <TrendingUp className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Top Scorer</p>
+                        <p className="font-bold text-lg text-slate-900 dark:text-slate-100">{match.team1Name || 'T1'}: {match.team1Score?.runs} runs</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-red-50/50 dark:bg-red-900/10 border-red-100 hover:shadow-md transition-shadow">
+                      <CardContent className="p-6 text-center">
+                        <Target className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Max Wickets</p>
+                        <p className="font-bold text-lg text-slate-900 dark:text-slate-100">{match.team2Name || 'T2'}: {match.team2Score?.wickets} wickets</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-100 hover:shadow-md transition-shadow">
+                      <CardContent className="p-6 text-center">
+                        <Timer className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Overs Bowled</p>
+                        <p className="font-bold text-lg text-slate-900 dark:text-slate-100">Total: {parseFloat(match.team1Score?.overs || '0') + parseFloat(match.team2Score?.overs || '0')} ov</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
         )}
 
         {/* Score Display */}
