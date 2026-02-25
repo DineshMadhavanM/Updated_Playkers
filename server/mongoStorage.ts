@@ -352,7 +352,7 @@ export class MongoStorage implements IStorage {
   }
 
   // Match operations (simplified)
-  async getMatches(filters?: { sport?: string; status?: string; isPublic?: boolean }): Promise<Match[]> {
+  async getMatches(filters?: { sport?: string; status?: string; isPublic?: boolean; region?: string }): Promise<Match[]> {
     let query: any = {};
 
     if (filters) {
@@ -361,6 +361,9 @@ export class MongoStorage implements IStorage {
       }
       if (filters.status) {
         query.status = filters.status;
+      }
+      if (filters.region) {
+        query.region = filters.region;
       }
       if (filters.isPublic !== undefined) {
         query.isPublic = filters.isPublic;
@@ -381,6 +384,7 @@ export class MongoStorage implements IStorage {
     const newMatch: Match = {
       id,
       ...match,
+      region: match.region,
       createdAt: new Date(),
       updatedAt: new Date(),
     } as Match;
@@ -1631,6 +1635,7 @@ export class MongoStorage implements IStorage {
       title: matchData.title,
       sport: matchData.sport,
       matchType: matchData.matchType,
+      region: matchData.region,
       isPublic: matchData.isPublic || null,
       venueId: matchData.venueId,
       organizerId: matchData.organizerId,

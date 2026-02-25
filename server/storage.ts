@@ -80,7 +80,7 @@ export interface IStorage {
   getUserVenues(userId: string): Promise<Venue[]>;
 
   // Match operations
-  getMatches(filters?: { sport?: string; status?: string; isPublic?: boolean }): Promise<Match[]>;
+  getMatches(filters?: { sport?: string; status?: string; isPublic?: boolean; region?: string }): Promise<Match[]>;
   getMatch(id: string): Promise<Match | undefined>;
   createMatch(match: InsertMatch): Promise<Match>;
   updateMatch(id: string, match: Partial<InsertMatch>): Promise<Match | undefined>;

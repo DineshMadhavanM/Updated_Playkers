@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { Server as SocketServer } from "socket.io";
 import { storage } from "./storage";
 import { initializeEmailAuth, requireAuth, requireAdmin, isAdminEmail, registerUser, loginUser } from "./emailAuth";
 import {
@@ -623,6 +624,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!match) {
         return res.status(404).json({ message: "Match not found" });
       }
+
+      // Emit real-time updates via Socket.io
+      const io = (app as any).io as SocketServer;
+      if (io) {
+        // Full match update for observers in the match room
+        io.to(match.id).emit("scoreUpdated", match);
+
+        // Summary update for listeners in the region room
+        if (match.region) {
+          io.to(match.region).emit("regionScoreUpdate", {
+            matchId: match.id,
+            teamA: match.team1Name,
+            teamB: match.team2Name,
+            team1Score: match.team1Score,
+            team2Score: match.team2Score,
+            status: match.status,
+            sport: match.sport
+          });
+        }
+      }
+
       res.json(match);
     } catch (error) {
       console.error("Error updating match:", error);
@@ -3029,6 +3051,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH /api/notifications/mark-all-read – mark all notifications as read
+  app.patch("/api/notifications/mark-all-read", requireAuth, async (req: any, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      const notifications = await storage.getNotifications(user.id, { status: "unread" });
+      await Promise.all(
+        notifications.map(n => storage.updateNotificationStatus(n.id, "read"))
+      );
+      res.json({ message: "All notifications marked as read", count: notifications.length });
+    } catch (error) {
+      console.error("Error marking all as read:", error);
+      res.status(500).json({ message: "Failed to mark all as read" });
+    }
+  });
+
   // Booking status update route
   app.patch("/api/bookings/:id/status", requireAuth, async (req: any, res) => {
     try {
@@ -3277,6 +3317,47 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
     }
   });
 
+  // ─────────────────────────────────────────────────────────────────────────
+
   const httpServer = createServer(app);
+
+  // Initialize Socket.io
+  const io = new SocketServer(httpServer, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    },
+    pingTimeout: 60000,
+  });
+
+  io.on("connection", (socket) => {
+    socket.on("joinMatch", (matchId) => {
+      socket.join(matchId);
+      console.log(`[SOCKET] Client ${socket.id} joined match room: ${matchId}`);
+    });
+
+    socket.on("joinRegion", (regionName) => {
+      socket.join(regionName);
+      console.log(`[SOCKET] Client ${socket.id} joined region room: ${regionName}`);
+    });
+
+    socket.on("leaveMatch", (matchId) => {
+      socket.leave(matchId);
+      console.log(`[SOCKET] Client ${socket.id} left match room: ${matchId}`);
+    });
+
+    socket.on("leaveRegion", (regionName) => {
+      socket.leave(regionName);
+      console.log(`[SOCKET] Client ${socket.id} left region room: ${regionName}`);
+    });
+
+    socket.on("disconnect", () => {
+      console.log(`[SOCKET] Client ${socket.id} disconnected`);
+    });
+  });
+
+  // Attach io to app for use in routes
+  (app as any).io = io;
+
   return httpServer;
 }

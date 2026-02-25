@@ -249,7 +249,7 @@ export default function MatchCard({ match, showActions = true, teamStats, perfor
               <div className="flex items-center text-xs font-medium text-muted-foreground group">
                 <MapPin className="h-3.5 w-3.5 mr-2 text-primary/60 group-hover:text-primary transition-colors" />
                 <span className="truncate" data-testid={`text-match-venue-${match.id}`}>
-                  Venue ID: {match.venueId}
+                  {match.region ? `${match.region} • ` : ''}{match.venueId}
                 </span>
               </div>
             </div>

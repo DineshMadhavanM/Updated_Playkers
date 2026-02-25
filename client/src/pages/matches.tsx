@@ -13,6 +13,7 @@ import { Plus, Search, Users, Play, ArrowLeft, Trophy } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { useEffect } from "react";
 import {
   Dialog,
@@ -30,6 +31,21 @@ export default function Matches() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [selectedSport, setSelectedSport] = useState("all");
+  const [selectedRegion, setSelectedRegion] = useState("All Regions");
+
+  const { joinRegion, leaveRegion, on, off } = useSocket();
+
+  const regions = [
+    "All Regions",
+    "Chennai",
+    "Coimbatore",
+    "Madurai",
+    "Trichy",
+    "Salem",
+    "Tirunelveli",
+    "Erode",
+    "Vellore"
+  ];
 
   // URL parameters for different modes
   const urlParams = new URLSearchParams(window.location.search);
@@ -64,10 +80,11 @@ export default function Matches() {
   }, [isAuthenticated, isLoading, toast]);
 
   const { data: allMatches = [], isLoading: matchesLoading } = useQuery({
-    queryKey: ["/api/matches", selectedSport],
+    queryKey: ["/api/matches", selectedSport, selectedRegion],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedSport && selectedSport !== "all") params.set("sport", selectedSport);
+      if (selectedRegion && selectedRegion !== "All Regions") params.set("region", selectedRegion);
 
       const response = await fetch(`/api/matches?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch matches");
@@ -76,6 +93,40 @@ export default function Matches() {
     enabled: isAuthenticated,
     retry: false,
   });
+
+  // Socket.io for real-time region updates
+  useEffect(() => {
+    if (!isAuthenticated || mode !== 'matches') return;
+
+    if (selectedRegion && selectedRegion !== "All Regions") {
+      joinRegion(selectedRegion);
+    }
+
+    on("regionScoreUpdate", (update: any) => {
+      console.log("[SOCKET] Received region score update:", update);
+      queryClient.setQueryData(["/api/matches", selectedSport, selectedRegion], (oldData: any[] | undefined) => {
+        if (!oldData) return [];
+        return oldData.map((match) => {
+          if (match.id === update.matchId) {
+            return {
+              ...match,
+              team1Score: update.team1Score,
+              team2Score: update.team2Score,
+              status: update.status
+            };
+          }
+          return match;
+        });
+      });
+    });
+
+    return () => {
+      if (selectedRegion && selectedRegion !== "All Regions") {
+        leaveRegion(selectedRegion);
+      }
+      off("regionScoreUpdate");
+    };
+  }, [selectedRegion, isAuthenticated, mode, selectedSport]);
 
   const { data: userMatches = [] } = useQuery({
     queryKey: ["/api/user/matches"],
@@ -461,21 +512,40 @@ export default function Matches() {
               </div>
             </div>
 
-            {/* Sport Filter */}
-            <div className="mb-8">
-              <Select value={selectedSport} onValueChange={setSelectedSport}>
-                <SelectTrigger className="w-[180px]" data-testid="select-sport-filter">
-                  <SelectValue placeholder="All Sports" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sports</SelectItem>
-                  {sports.map((sport) => (
-                    <SelectItem key={sport} value={sport}>
-                      {sport.charAt(0).toUpperCase() + sport.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground ml-1">Sport</Label>
+                <Select value={selectedSport} onValueChange={setSelectedSport}>
+                  <SelectTrigger className="w-[180px]" data-testid="select-sport-filter">
+                    <SelectValue placeholder="All Sports" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sports</SelectItem>
+                    {sports.map((sport) => (
+                      <SelectItem key={sport} value={sport}>
+                        {sport.charAt(0).toUpperCase() + sport.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground ml-1">Region</Label>
+                <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                  <SelectTrigger className="w-[180px]" data-testid="select-region-filter">
+                    <SelectValue placeholder="All Regions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {regions.map((region) => (
+                      <SelectItem key={region} value={region}>
+                        {region}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Matches Tabs */}

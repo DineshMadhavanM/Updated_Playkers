@@ -12,6 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
+import { queryClient } from "@/lib/queryClient";
 import { Calendar, MapPin, Users, Eye, RefreshCw, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import type { Match, MatchParticipant } from "@shared/schema";
@@ -23,10 +25,12 @@ export default function MatchSpectator() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
+  const { joinMatch, leaveMatch, on, off, isConnected } = useSocket();
+
   const { data: match, isLoading: matchLoading, refetch } = useQuery<Match>({
     queryKey: ["/api/matches", params?.id],
     enabled: !!params?.id,
-    refetchInterval: autoRefresh ? 5000 : false, // Auto-refresh every 5 seconds
+    refetchInterval: isConnected ? false : (autoRefresh ? 5000 : false), // Fallback to polling if socket is not connected
   });
 
   const { data: participants = [] } = useQuery<MatchParticipant[]>({
@@ -38,8 +42,26 @@ export default function MatchSpectator() {
   const { data: rosterPlayers = [] } = useQuery<any[]>({
     queryKey: ["/api/matches", params?.id, "roster"],
     enabled: !!params?.id && match?.sport === 'cricket',
-    refetchInterval: autoRefresh ? 5000 : false,
+    refetchInterval: isConnected ? false : (autoRefresh ? 5000 : false),
   });
+
+  // Socket.io for real-time match updates
+  useEffect(() => {
+    if (!params?.id) return;
+
+    joinMatch(params.id);
+
+    on("scoreUpdated", (updatedMatch: Match) => {
+      console.log("[SOCKET] Received full match update:", updatedMatch);
+      queryClient.setQueryData(["/api/matches", params.id], updatedMatch);
+      setLastRefresh(new Date());
+    });
+
+    return () => {
+      leaveMatch(params.id);
+      off("scoreUpdated");
+    };
+  }, [params?.id]);
 
   // Update last refresh time when data changes
   useEffect(() => {
@@ -88,8 +110,8 @@ export default function MatchSpectator() {
     setAutoRefresh(!autoRefresh);
     toast({
       title: autoRefresh ? "Auto-refresh disabled" : "Auto-refresh enabled",
-      description: autoRefresh 
-        ? "You'll need to refresh manually" 
+      description: autoRefresh
+        ? "You'll need to refresh manually"
         : "Match will update every 5 seconds",
     });
   };
@@ -167,9 +189,9 @@ export default function MatchSpectator() {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
-              <Badge 
+              <Badge
                 variant={match.status === 'live' ? 'default' : match.status === 'completed' ? 'secondary' : 'outline'}
                 className={match.status === 'live' ? 'bg-red-500 animate-pulse' : ''}
                 data-testid={`badge-status-${match.status}`}
@@ -194,14 +216,14 @@ export default function MatchSpectator() {
                     {lastRefresh.toLocaleTimeString()}
                   </span>
                 </div>
-                {match.status === 'live' && (
+                {(match.status === 'live' || isConnected) && (
                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">
-                    <RefreshCw className={`h-3 w-3 mr-1 ${autoRefresh ? 'animate-spin' : ''}`} />
-                    {autoRefresh ? 'Auto-updating' : 'Paused'}
+                    <RefreshCw className={`h-3 w-3 mr-1 ${autoRefresh || isConnected ? 'animate-spin' : ''}`} />
+                    {isConnected ? 'Live Socket Connected' : (autoRefresh ? 'Auto-updating' : 'Paused')}
                   </Badge>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -235,7 +257,7 @@ export default function MatchSpectator() {
               <div>
                 <p className="font-medium text-blue-900 dark:text-blue-100">Spectator Mode</p>
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  You're viewing this match in read-only mode. {match.status === 'live' && 'Scores update automatically every 5 seconds.'}
+                  You're viewing this match in read-only mode. {isConnected ? 'Scores update in real-time via WebSocket.' : (match.status === 'live' && 'Scores update automatically every 5 seconds.')}
                 </p>
               </div>
             </div>
@@ -254,7 +276,7 @@ export default function MatchSpectator() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle className="text-lg" data-testid="text-team2-name">{match.team2Name || 'Team 2'}</CardTitle>
