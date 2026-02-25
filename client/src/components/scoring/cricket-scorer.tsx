@@ -300,6 +300,60 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
     return null;
   };
 
+  // Synchronize state from match prop when in spectator mode (!isLive)
+  useEffect(() => {
+    if (!isLive && match) {
+      const { team1Score, team2Score, matchData } = match;
+
+      if (team1Score) {
+        if (team1Score.runs !== undefined && team1Score.runs !== null) setTeam1Runs(team1Score.runs);
+        if (team1Score.wickets !== undefined && team1Score.wickets !== null) setTeam1Wickets(team1Score.wickets);
+
+        const overs = team1Score.overs || "0.0";
+        const parts = String(overs).split('.');
+        const o = parseInt(parts[0]) || 0;
+        const b = parseInt(parts[1]) || 0;
+        setTeam1Balls(o * 6 + b);
+
+        if (matchData?.currentInning === 1) {
+          setCurrentOver(o);
+          setCurrentBall(b);
+        }
+      }
+
+      if (team2Score) {
+        if (team2Score.runs !== undefined && team2Score.runs !== null) setTeam2Runs(team2Score.runs);
+        if (team2Score.wickets !== undefined && team2Score.wickets !== null) setTeam2Wickets(team2Score.wickets);
+
+        const overs = team2Score.overs || "0.0";
+        const parts = String(overs).split('.');
+        const o = parseInt(parts[0]) || 0;
+        const b = parseInt(parts[1]) || 0;
+        setTeam2Balls(o * 6 + b);
+
+        if (matchData?.currentInning === 2) {
+          setCurrentOver(o);
+          setCurrentBall(b);
+        }
+      }
+
+      if (matchData) {
+        if (matchData.currentInning) setCurrentInning(matchData.currentInning);
+        if (matchData.ballByBall) setBallByBall(matchData.ballByBall);
+
+        if (matchData.currentPlayers) {
+          const { striker, nonStriker, bowler } = matchData.currentPlayers;
+          if (striker) setCurrentStriker(striker);
+          if (nonStriker) setCurrentNonStriker(nonStriker);
+          if (bowler) setCurrentBowler(bowler);
+        }
+
+        if (matchData.battingStats) setBattingStats(matchData.battingStats);
+        if (matchData.bowlingStats) setBowlingStats(matchData.bowlingStats);
+      }
+    }
+  }, [isLive, match]);
+
   // Initialize current players from match data when match goes live
   useEffect(() => {
     if (isLive && match?.matchData?.currentPlayers) {
@@ -1691,6 +1745,13 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
         currentInning,
         ballByBall: currentBallByBall,
         lastBall: currentBallByBall[currentBallByBall.length - 1],
+        currentPlayers: {
+          striker: currentStriker,
+          nonStriker: currentNonStriker,
+          bowler: currentBowler
+        },
+        battingStats,
+        bowlingStats
       },
     };
     onScoreUpdate(scoreData);

@@ -496,23 +496,13 @@ export default function CreateMatch() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Region</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger data-testid="select-region">
-                              <SelectValue placeholder="Select region" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {regions.map((region) => (
-                              <SelectItem key={region} value={region}>
-                                {region}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="e.g. Tamil Nadu, South India"
+                            data-testid="input-region"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

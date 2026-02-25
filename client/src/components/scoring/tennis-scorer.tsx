@@ -17,11 +17,32 @@ export default function TennisScorer({ match, onScoreUpdate, isLive }: TennisSco
   const [player1Points, setPlayer1Points] = useState(0);
   const [player2Points, setPlayer2Points] = useState(0);
   const [currentSet, setCurrentSet] = useState(1);
-  const [setHistory, setSetHistory] = useState<Array<{set: number, player1: number, player2: number}>>([]);
+  const [setHistory, setSetHistory] = useState<Array<{ set: number, player1: number, player2: number }>>([]);
   const [isDeuce, setIsDeuce] = useState(false);
   const [advantage, setAdvantage] = useState<1 | 2 | null>(null);
 
   const pointsDisplay = ["0", "15", "30", "40"];
+
+  // Sync state from match prop when in spectator mode (!isLive)
+  useEffect(() => {
+    if (!isLive && match) {
+      const { team1Score, team2Score, matchData } = match;
+      if (team1Score) {
+        if (team1Score.sets !== undefined) setPlayer1Sets(team1Score.sets);
+        if (team1Score.games !== undefined) setPlayer1Games(team1Score.games);
+      }
+      if (team2Score) {
+        if (team2Score.sets !== undefined) setPlayer2Sets(team2Score.sets);
+        if (team2Score.games !== undefined) setPlayer2Games(team2Score.games);
+      }
+      if (matchData) {
+        if (matchData.currentSet) setCurrentSet(matchData.currentSet);
+        if (matchData.setHistory) setSetHistory(matchData.setHistory);
+        if (matchData.isDeuce !== undefined) setIsDeuce(matchData.isDeuce);
+        if (matchData.advantage !== undefined) setAdvantage(matchData.advantage);
+      }
+    }
+  }, [isLive, match]);
 
   // Update score whenever state changes
   useEffect(() => {
@@ -225,14 +246,14 @@ export default function TennisScorer({ match, onScoreUpdate, isLive }: TennisSco
             <div className="space-y-4">
               <h4 className="font-semibold">Award Point</h4>
               <div className="grid grid-cols-2 gap-4">
-                <Button 
+                <Button
                   onClick={() => addPoint(1)}
                   className="w-full"
                   data-testid="button-point-player1"
                 >
                   Point for {match.team1Name || "Player 1"}
                 </Button>
-                <Button 
+                <Button
                   onClick={() => addPoint(2)}
                   className="w-full"
                   data-testid="button-point-player2"

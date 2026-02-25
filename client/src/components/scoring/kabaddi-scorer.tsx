@@ -21,8 +21,31 @@ export default function KabaddiScorer({ match, onScoreUpdate, isLive }: KabaddiS
   const [team1Tackles, setTeam1Tackles] = useState(0);
   const [team2Tackles, setTeam2Tackles] = useState(0);
   const [raidingTeam, setRaidingTeam] = useState<1 | 2>(1);
-  const [events, setEvents] = useState<Array<{time: number, event: string, team: string, points: number}>>([]);
+  const [events, setEvents] = useState<Array<{ time: number, event: string, team: string, points: number }>>([]);
   const [playerName, setPlayerName] = useState("");
+
+  // Sync state from match prop when in spectator mode (!isLive)
+  useEffect(() => {
+    if (!isLive && match) {
+      const { team1Score, team2Score, matchData } = match;
+      if (team1Score) {
+        if (team1Score.points !== undefined) setTeam1Score(team1Score.points);
+        if (team1Score.raids !== undefined) setTeam1Raids(team1Score.raids);
+        if (team1Score.tackles !== undefined) setTeam1Tackles(team1Score.tackles);
+      }
+      if (team2Score) {
+        if (team2Score.points !== undefined) setTeam2Score(team2Score.points);
+        if (team2Score.raids !== undefined) setTeam2Raids(team2Score.raids);
+        if (team2Score.tackles !== undefined) setTeam2Tackles(team2Score.tackles);
+      }
+      if (matchData) {
+        if (matchData.currentHalf) setCurrentHalf(matchData.currentHalf);
+        if (matchData.currentTime !== undefined) setCurrentTime(matchData.currentTime);
+        if (matchData.raidingTeam) setRaidingTeam(matchData.raidingTeam);
+        if (matchData.events) setEvents(matchData.events);
+      }
+    }
+  }, [isLive, match]);
 
   // Update score whenever state changes
   useEffect(() => {
@@ -70,7 +93,7 @@ export default function KabaddiScorer({ match, onScoreUpdate, isLive }: KabaddiS
 
     setEvents(prev => [...prev, event]);
     setPlayerName("");
-    
+
     // Switch raiding team
     setRaidingTeam(team === 1 ? 2 : 1);
   };
@@ -242,21 +265,21 @@ export default function KabaddiScorer({ match, onScoreUpdate, isLive }: KabaddiS
                   <div className="space-y-2">
                     <p className="text-sm font-medium">{match.team1Name || "Team 1"}</p>
                     <div className="flex gap-2">
-                      <Button 
+                      <Button
                         onClick={() => addRaidPoint(1, 1)}
                         variant={raidingTeam === 1 ? "default" : "outline"}
                         data-testid="button-raid-1-team1"
                       >
                         +1
                       </Button>
-                      <Button 
+                      <Button
                         onClick={() => addRaidPoint(1, 2)}
                         variant={raidingTeam === 1 ? "default" : "outline"}
                         data-testid="button-raid-2-team1"
                       >
                         +2
                       </Button>
-                      <Button 
+                      <Button
                         onClick={() => addRaidPoint(1, 3)}
                         variant={raidingTeam === 1 ? "default" : "outline"}
                         data-testid="button-raid-3-team1"
@@ -268,21 +291,21 @@ export default function KabaddiScorer({ match, onScoreUpdate, isLive }: KabaddiS
                   <div className="space-y-2">
                     <p className="text-sm font-medium">{match.team2Name || "Team 2"}</p>
                     <div className="flex gap-2">
-                      <Button 
+                      <Button
                         onClick={() => addRaidPoint(2, 1)}
                         variant={raidingTeam === 2 ? "default" : "outline"}
                         data-testid="button-raid-1-team2"
                       >
                         +1
                       </Button>
-                      <Button 
+                      <Button
                         onClick={() => addRaidPoint(2, 2)}
                         variant={raidingTeam === 2 ? "default" : "outline"}
                         data-testid="button-raid-2-team2"
                       >
                         +2
                       </Button>
-                      <Button 
+                      <Button
                         onClick={() => addRaidPoint(2, 3)}
                         variant={raidingTeam === 2 ? "default" : "outline"}
                         data-testid="button-raid-3-team2"
@@ -298,14 +321,14 @@ export default function KabaddiScorer({ match, onScoreUpdate, isLive }: KabaddiS
               <div>
                 <h4 className="font-semibold mb-3">Tackle Points</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <Button 
+                  <Button
                     onClick={() => addTacklePoint(1)}
                     className="w-full"
                     data-testid="button-tackle-team1"
                   >
                     Tackle for {match.team1Name || "Team 1"}
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => addTacklePoint(2)}
                     className="w-full"
                     data-testid="button-tackle-team2"
@@ -319,14 +342,14 @@ export default function KabaddiScorer({ match, onScoreUpdate, isLive }: KabaddiS
               <div>
                 <h4 className="font-semibold mb-3">Bonus Points</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={() => addBonusPoint(1)}
                     data-testid="button-bonus-team1"
                   >
                     Bonus for {match.team1Name || "Team 1"}
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={() => addBonusPoint(2)}
                     data-testid="button-bonus-team2"
@@ -340,14 +363,14 @@ export default function KabaddiScorer({ match, onScoreUpdate, isLive }: KabaddiS
               <div>
                 <h4 className="font-semibold mb-3">All Out (+2 Points)</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <Button 
+                  <Button
                     variant="destructive"
                     onClick={() => addAllOut(1)}
                     data-testid="button-allout-team1"
                   >
                     All Out for {match.team1Name || "Team 1"}
                   </Button>
-                  <Button 
+                  <Button
                     variant="destructive"
                     onClick={() => addAllOut(2)}
                     data-testid="button-allout-team2"
@@ -361,14 +384,14 @@ export default function KabaddiScorer({ match, onScoreUpdate, isLive }: KabaddiS
               <div>
                 <h4 className="font-semibold mb-3">Change Raiding Team</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={() => setRaidingTeam(1)}
                     data-testid="button-raid-team1"
                   >
                     {match.team1Name || "Team 1"} Raids
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={() => setRaidingTeam(2)}
                     data-testid="button-raid-team2"
@@ -381,7 +404,7 @@ export default function KabaddiScorer({ match, onScoreUpdate, isLive }: KabaddiS
               {/* Half Control */}
               {currentHalf === 1 && (
                 <div>
-                  <Button 
+                  <Button
                     onClick={switchHalf}
                     className="w-full"
                     data-testid="button-switch-half"

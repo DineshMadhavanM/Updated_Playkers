@@ -126,6 +126,32 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
     }
   }, [rosterPlayers, team1Players.length, team2Players.length]);
 
+  // Synchronize state from match prop when in spectator mode (!isLive)
+  useEffect(() => {
+    if (!isLive && match) {
+      const { team1Score, team2Score, matchData } = match;
+
+      if (team1Score) {
+        if (team1Score.goals !== undefined && team1Score.goals !== null) setTeam1Goals(team1Score.goals);
+      }
+      if (team2Score) {
+        if (team2Score.goals !== undefined && team2Score.goals !== null) setTeam2Goals(team2Score.goals);
+      }
+      if (matchData) {
+        if (matchData.currentHalf) setCurrentHalf(matchData.currentHalf);
+        if (matchData.currentMinute !== undefined) setCurrentMinute(matchData.currentMinute);
+        if (matchData.injuryTime !== undefined) setInjuryTime(matchData.injuryTime);
+        if (matchData.matchEvents) setMatchEvents(matchData.matchEvents);
+        if (matchData.team1Substitutions) setTeam1Substitutions(matchData.team1Substitutions);
+        if (matchData.team2Substitutions) setTeam2Substitutions(matchData.team2Substitutions);
+        if (matchData.team1Players) setTeam1Players(matchData.team1Players);
+        if (matchData.team2Players) setTeam2Players(matchData.team2Players);
+        if (matchData.isMatchCompleted) setIsMatchCompleted(matchData.isMatchCompleted);
+        if (matchData.matchResult) setMatchResult(matchData.matchResult);
+      }
+    }
+  }, [isLive, match]);
+
   // Broadcast score updates when state changes
   useEffect(() => {
     if (isLive && (team1Players.length > 0 || team2Players.length > 0)) {
@@ -139,11 +165,15 @@ export default function FootballScorer({ match, onScoreUpdate, isLive, rosterPla
           matchEvents,
           team1Substitutions,
           team2Substitutions,
+          team1Players,
+          team2Players,
+          isMatchCompleted,
+          matchResult,
         },
       };
       onScoreUpdate(scoreData);
     }
-  }, [team1Goals, team2Goals, currentHalf, currentMinute, injuryTime, matchEvents, team1Substitutions, team2Substitutions, isLive, team1Players.length, team2Players.length, onScoreUpdate]);
+  }, [team1Goals, team2Goals, currentHalf, currentMinute, injuryTime, matchEvents, team1Substitutions, team2Substitutions, isLive, team1Players, team2Players, isMatchCompleted, matchResult, onScoreUpdate]);
 
   // Save state for undo
   const saveStateSnapshot = () => {

@@ -356,13 +356,13 @@ export class MongoStorage implements IStorage {
     let query: any = {};
 
     if (filters) {
-      if (filters.sport) {
+      if (filters.sport && filters.sport !== 'all') {
         query.sport = filters.sport;
       }
-      if (filters.status) {
+      if (filters.status && filters.status !== 'all') {
         query.status = filters.status;
       }
-      if (filters.region) {
+      if (filters.region && filters.region !== 'All Regions') {
         query.region = filters.region;
       }
       if (filters.isPublic !== undefined) {
@@ -370,10 +370,14 @@ export class MongoStorage implements IStorage {
       }
     }
 
-    console.log(`[DEBUG] MongoStorage.getMatches - Query:`, JSON.stringify(query));
+    console.log(`[DEBUG] MongoStorage.getMatches - Optimized Query:`, JSON.stringify(query));
     try {
+      console.log(`[DEBUG] MongoStorage.getMatches - Executing find with query:`, JSON.stringify(query));
       const matches = await this.matches.find(query).sort({ createdAt: -1 }).toArray();
       console.log(`[DEBUG] MongoStorage.getMatches - Found ${matches.length} matches`);
+      if (matches.length > 0) {
+        console.log(`[DEBUG] MongoStorage.getMatches - Sample match (first):`, JSON.stringify(matches[0]).substring(0, 200));
+      }
       return matches;
     } catch (dbError: any) {
       console.error(`[DEBUG] MongoStorage.getMatches - DB Error:`, dbError);

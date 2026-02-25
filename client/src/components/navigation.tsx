@@ -16,11 +16,14 @@ import SearchPlayerDialog from "@/components/search-player-dialog";
 import InvitePlayerDialog from "@/components/invite-player-dialog";
 import WatchLiveMatchDialog from "@/components/watch-live-match-dialog";
 import NotificationsDropdown from "@/components/notifications-dropdown";
+import { useNotifications } from "@/hooks/use-notifications";
 
 export default function Navigation() {
   const [location] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  // Initialize notification polling and toasts
+  useNotifications();
 
   const handleLogout = async () => {
     try {
@@ -150,6 +153,12 @@ export default function Navigation() {
               </SheetTrigger>
               <SheetContent side="right">
                 <div className="flex flex-col space-y-4 mt-6">
+                  {isAuthenticated && (
+                    <div className="flex items-center justify-between px-2 py-1">
+                      <span className="text-sm font-medium">Notifications</span>
+                      <NotificationsDropdown />
+                    </div>
+                  )}
                   <NavItems mobile />
                   {isAuthenticated && (
                     <>

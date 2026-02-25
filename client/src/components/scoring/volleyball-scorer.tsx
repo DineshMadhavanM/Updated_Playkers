@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +17,29 @@ export default function VolleyballScorer({ match, onScoreUpdate, isLive }: Volle
   const [team2Points, setTeam2Points] = useState(0);
   const [currentSet, setCurrentSet] = useState(1);
   const [servingTeam, setServingTeam] = useState<1 | 2>(1);
-  const [setHistory, setSetHistory] = useState<Array<{set: number, team1: number, team2: number}>>([]);
-  const [rallies, setRallies] = useState<Array<{set: number, point: string, team: string}>>([]);
+  const [setHistory, setSetHistory] = useState<Array<{ set: number, team1: number, team2: number }>>([]);
+  const [rallies, setRallies] = useState<Array<{ set: number, point: string, team: string }>>([]);
+
+  // Sync state from match prop when in spectator mode (!isLive)
+  useEffect(() => {
+    if (!isLive && match) {
+      const { team1Score, team2Score, matchData } = match;
+      if (team1Score) {
+        if (team1Score.sets !== undefined) setTeam1Sets(team1Score.sets);
+        if (team1Score.points !== undefined) setTeam1Points(team1Score.points);
+      }
+      if (team2Score) {
+        if (team2Score.sets !== undefined) setTeam2Sets(team2Score.sets);
+        if (team2Score.points !== undefined) setTeam2Points(team2Score.points);
+      }
+      if (matchData) {
+        if (matchData.currentSet) setCurrentSet(matchData.currentSet);
+        if (matchData.servingTeam) setServingTeam(matchData.servingTeam);
+        if (matchData.setHistory) setSetHistory(matchData.setHistory);
+        if (matchData.rallies) setRallies(matchData.rallies);
+      }
+    }
+  }, [isLive, match]);
 
   const addPoint = (team: 1 | 2) => {
     if (!isLive) return;
@@ -49,7 +71,7 @@ export default function VolleyballScorer({ match, onScoreUpdate, isLive }: Volle
 
     // Standard volleyball scoring: first to 25 points, must win by 2
     const isSetWin = (t1Points >= 25 || t2Points >= 25) && Math.abs(t1Points - t2Points) >= 2;
-    
+
     // Fifth set (if applicable): first to 15 points, must win by 2
     const isFinalSetWin = currentSet === 5 && (t1Points >= 15 || t2Points >= 15) && Math.abs(t1Points - t2Points) >= 2;
 
@@ -175,7 +197,7 @@ export default function VolleyballScorer({ match, onScoreUpdate, isLive }: Volle
             <div className="space-y-4">
               <h4 className="font-semibold">Award Point</h4>
               <div className="grid grid-cols-2 gap-4">
-                <Button 
+                <Button
                   onClick={() => addPoint(1)}
                   className="w-full"
                   variant={servingTeam === 1 ? "default" : "outline"}
@@ -184,7 +206,7 @@ export default function VolleyballScorer({ match, onScoreUpdate, isLive }: Volle
                   Point for {match.team1Name || "Team 1"}
                   {servingTeam === 1 && " (Serving)"}
                 </Button>
-                <Button 
+                <Button
                   onClick={() => addPoint(2)}
                   className="w-full"
                   variant={servingTeam === 2 ? "default" : "outline"}
@@ -198,15 +220,15 @@ export default function VolleyballScorer({ match, onScoreUpdate, isLive }: Volle
               <div className="text-center">
                 <h4 className="font-semibold mb-2">Change Serving Team</h4>
                 <div className="flex gap-2 justify-center">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setServingTeam(1)}
                     data-testid="button-serve-team1"
                   >
                     {match.team1Name || "Team 1"} Serves
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setServingTeam(2)}
                     data-testid="button-serve-team2"
                   >
