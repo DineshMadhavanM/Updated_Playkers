@@ -12,6 +12,15 @@ import tls from 'node:tls';
 // Set minimum TLS version to 1.2 for Atlas compatibility
 // (tls as any).DEFAULT_MIN_VERSION = 'TLSv1.2';
 
+// Global error handlers for better crash diagnostics
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

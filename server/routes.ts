@@ -512,7 +512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Match routes
   app.get('/api/matches', async (req, res) => {
-    console.log(`[DEBUG] GET /api/matches hit with query:`, req.query);
+    console.log(`[DEBUG] GET /api/matches hit with query:`, JSON.stringify(req.query));
     try {
       const { sport, status, isPublic, region } = req.query;
       const matches = await storage.getMatches({
@@ -521,7 +521,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         region: region as string,
         isPublic: isPublic === 'true' ? true : (isPublic === 'false' ? false : undefined),
       });
-      res.json(matches);
+
+      // Map to remove MongoDB internal _id if present and ensure clean JSON
+      const serializedMatches = matches.map(m => {
+        const { _id, ...rest } = m as any;
+        return rest;
+      });
+
+      console.log(`[DEBUG] Returning ${serializedMatches.length} matches`);
+      res.json(serializedMatches);
     } catch (error: any) {
       console.error("Error fetching matches:", error);
       res.status(500).json({
@@ -539,9 +547,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Match not found" });
       }
       res.json(match);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching match:", error);
-      res.status(500).json({ message: "Failed to fetch match" });
+      res.status(500).json({
+        message: "Failed to fetch match",
+        error: error.message,
+        stack: error.stack
+      });
     }
   });
 
@@ -2785,7 +2797,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/notifications", async (req, res) => {
     try {
-      const user = (req as any).user;
+      const user = (req as any).session?.user;
       if (!user) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -2803,7 +2815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/notifications/unread-count", async (req, res) => {
     try {
-      const user = (req as any).user;
+      const user = (req as any).session?.user;
       if (!user) {
         return res.status(401).json({ message: "Authentication required" });
       }
