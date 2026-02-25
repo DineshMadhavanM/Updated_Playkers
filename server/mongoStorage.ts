@@ -370,8 +370,15 @@ export class MongoStorage implements IStorage {
       }
     }
 
-    const matches = await this.matches.find(query).sort({ createdAt: -1 }).toArray();
-    return matches;
+    console.log(`[DEBUG] MongoStorage.getMatches - Query:`, JSON.stringify(query));
+    try {
+      const matches = await this.matches.find(query).sort({ createdAt: -1 }).toArray();
+      console.log(`[DEBUG] MongoStorage.getMatches - Found ${matches.length} matches`);
+      return matches;
+    } catch (dbError: any) {
+      console.error(`[DEBUG] MongoStorage.getMatches - DB Error:`, dbError);
+      throw dbError;
+    }
   }
 
   async getMatch(id: string): Promise<Match | undefined> {
@@ -384,7 +391,7 @@ export class MongoStorage implements IStorage {
     const newMatch: Match = {
       id,
       ...match,
-      region: match.region,
+      region: match.region || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     } as Match;
@@ -1635,7 +1642,7 @@ export class MongoStorage implements IStorage {
       title: matchData.title,
       sport: matchData.sport,
       matchType: matchData.matchType,
-      region: matchData.region,
+      region: matchData.region || null,
       isPublic: matchData.isPublic || null,
       venueId: matchData.venueId,
       organizerId: matchData.organizerId,
