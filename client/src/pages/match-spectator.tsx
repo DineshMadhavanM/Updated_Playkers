@@ -302,33 +302,43 @@ export default function MatchSpectator() {
           </Card>
         )}
 
-        {match.status === 'completed' && (
+        {(match.status === 'live' || match.status === 'completed') && (
           <div className="space-y-6 mb-8">
-            {/* Main Result Card */}
-            <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 dark:border-green-800 dark:from-green-950 dark:to-emerald-950">
-              <CardContent className="p-8">
-                <div className="text-center space-y-4">
-                  <Trophy className="h-12 w-12 text-yellow-500 mx-auto animate-bounce" />
-                  <div>
-                    <h2 className="text-3xl font-black text-green-900 dark:text-green-100 uppercase tracking-tight">
-                      {match.matchData?.matchResult || 'Match Completed'}
-                    </h2>
-                    <p className="text-green-700 dark:text-green-400 font-medium mt-1">
-                      Final Score: {match.team1Score?.runs}/{match.team1Score?.wickets} vs {match.team2Score?.runs}/{match.team2Score?.wickets}
-                    </p>
+            {match.status === 'completed' && (
+              <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 dark:border-green-800 dark:from-green-950 dark:to-emerald-950">
+                <CardContent className="p-8">
+                  <div className="text-center space-y-4">
+                    <Trophy className="h-12 w-12 text-yellow-500 mx-auto animate-bounce" />
+                    <div>
+                      <h2 className="text-3xl font-black text-green-900 dark:text-green-100 uppercase tracking-tight">
+                        {match.matchData?.matchResult || 'Match Completed'}
+                      </h2>
+                      <p className="text-green-700 dark:text-green-400 font-medium mt-1">
+                        Final Score: {match.team1Score?.runs}/{match.team1Score?.wickets} vs {match.team2Score?.runs}/{match.team2Score?.wickets}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Detailed Results Tabs */}
-            <Tabs defaultValue="overview" className="w-full">
+            <Tabs defaultValue={match.status === 'live' ? "live-score" : "overview"} className="w-full">
               <TabsList className="grid w-full grid-cols-4 lg:w-[600px] mx-auto mb-8 bg-muted/50 p-1">
                 <TabsTrigger value="overview" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Overview</TabsTrigger>
+                {match.status === 'live' && (
+                  <TabsTrigger value="live-score" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Live Score</TabsTrigger>
+                )}
                 <TabsTrigger value="scorecard" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Scorecard</TabsTrigger>
+                <TabsTrigger value="achievements" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Achievements</TabsTrigger>
                 <TabsTrigger value="squads" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Squads</TabsTrigger>
-                <TabsTrigger value="awards" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Awards</TabsTrigger>
               </TabsList>
+
+              {match.status === 'live' && (
+                <TabsContent value="live-score" className="space-y-6">
+                  {renderScorer()}
+                </TabsContent>
+              )}
 
               <TabsContent value="overview" className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -536,56 +546,138 @@ export default function MatchSpectator() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="awards" className="space-y-6">
+              <TabsContent value="achievements" className="space-y-6">
                 <div className="max-w-4xl mx-auto space-y-8">
-                  {/* TOP HIGHLIGHTS */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* POM Card */}
-                    <Card className="md:col-span-3 bg-gradient-to-r from-yellow-400/10 via-orange-400/10 to-yellow-400/10 border-yellow-400/30 overflow-hidden relative group">
-                      <div className="absolute inset-0 bg-white/5 dark:bg-black/5 animate-pulse group-hover:animate-none"></div>
-                      <CardContent className="p-8 text-center relative z-10">
-                        <Trophy className="h-16 w-16 text-yellow-500 mx-auto mb-4 drop-shadow-lg" />
-                        <h3 className="text-sm font-black text-yellow-800 dark:text-yellow-200 uppercase tracking-[0.4em] mb-4">Player of the Match</h3>
-                        <div className="text-4xl lg:text-5xl font-black text-slate-900 dark:text-white drop-shadow-sm mb-2">
-                          {match.matchData?.selectedManOfMatch || 'Not Announced'}
-                        </div>
-                        <p className="text-muted-foreground font-medium italic">Outstanding Performance for the Team</p>
-                      </CardContent>
-                    </Card>
+                  <Card className="shadow-md overflow-hidden">
+                    <CardHeader className="bg-primary/5 border-b py-4">
+                      <CardTitle className="text-lg font-black flex items-center gap-2 uppercase tracking-wide">
+                        <Trophy className="h-5 w-5 text-yellow-500" /> Match Achievements
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {[
+                          { label: "Man of the Match", name: match.matchData?.selectedManOfMatch, icon: Trophy, color: "text-yellow-600 bg-yellow-100" },
+                          { label: "Best Batsman", name: match.matchData?.selectedBestBatsman, icon: Award, color: "text-blue-600 bg-blue-100" },
+                          { label: "Best Bowler", name: match.matchData?.selectedBestBowler, icon: Award, color: "text-red-600 bg-red-100" },
+                          { label: "Best Fielder", name: match.matchData?.selectedBestFielder, icon: Award, color: "text-green-600 bg-green-100" },
+                        ].map((award, idx) => (
+                          <Card key={idx} className="overflow-hidden border-2 border-muted/50 hover:border-primary/30 transition-colors">
+                            <div className={`p-4 flex items-center justify-center ${award.color.split(' ')[1]}`}>
+                              <award.icon className={`h-8 w-8 ${award.color.split(' ')[0]}`} />
+                            </div>
+                            <CardContent className="p-4 text-center">
+                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">{award.label}</p>
+                              <p className="text-lg font-black text-slate-900 dark:text-slate-100">
+                                {award.name || "TBA"}
+                              </p>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
 
-                    {/* Stats Highlights */}
-                    <Card className="bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 hover:shadow-md transition-shadow">
-                      <CardContent className="p-6 text-center">
-                        <TrendingUp className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Top Scorer</p>
-                        <p className="font-bold text-lg text-slate-900 dark:text-slate-100">{match.team1Name || 'T1'}: {match.team1Score?.runs} runs</p>
-                      </CardContent>
-                    </Card>
+                      {/* Stats Highlights Fallback */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+                        <Card className="bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 shadow-sm">
+                          <CardContent className="p-6 text-center">
+                            <TrendingUp className="h-6 w-6 text-blue-500 mx-auto mb-2" />
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Top Score</p>
+                            <p className="font-bold text-lg text-slate-900 dark:text-slate-100">{Math.max(match.team1Score?.runs || 0, match.team2Score?.runs || 0)} Runs</p>
+                          </CardContent>
+                        </Card>
 
-                    <Card className="bg-red-50/50 dark:bg-red-900/10 border-red-100 hover:shadow-md transition-shadow">
-                      <CardContent className="p-6 text-center">
-                        <Target className="h-8 w-8 text-red-500 mx-auto mb-2" />
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Max Wickets</p>
-                        <p className="font-bold text-lg text-slate-900 dark:text-slate-100">{match.team2Name || 'T2'}: {match.team2Score?.wickets} wickets</p>
-                      </CardContent>
-                    </Card>
+                        <Card className="bg-red-50/50 dark:bg-red-900/10 border-red-100 shadow-sm">
+                          <CardContent className="p-6 text-center">
+                            <Target className="h-6 w-6 text-red-500 mx-auto mb-2" />
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Max Wickets</p>
+                            <p className="font-bold text-lg text-slate-900 dark:text-slate-100">{Math.max(match.team1Score?.wickets || 0, match.team2Score?.wickets || 0)} Wickets</p>
+                          </CardContent>
+                        </Card>
 
-                    <Card className="bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-100 hover:shadow-md transition-shadow">
-                      <CardContent className="p-6 text-center">
-                        <Timer className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Overs Bowled</p>
-                        <p className="font-bold text-lg text-slate-900 dark:text-slate-100">Total: {parseFloat(match.team1Score?.overs || '0') + parseFloat(match.team2Score?.overs || '0')} ov</p>
-                      </CardContent>
-                    </Card>
-                  </div>
+                        <Card className="bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-100 shadow-sm">
+                          <CardContent className="p-6 text-center">
+                            <Timer className="h-6 w-6 text-emerald-500 mx-auto mb-2" />
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Total Overs</p>
+                            <p className="font-bold text-lg text-slate-900 dark:text-slate-100">Full match played</p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="squads" className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Team 1 Squad */}
+                  <Card className="shadow-md overflow-hidden">
+                    <CardHeader className="bg-primary/5 border-b py-4">
+                      <CardTitle className="text-lg font-black flex items-center gap-2 uppercase tracking-wide">
+                        <Users className="h-5 w-5 text-primary" /> {match.team1Name || 'Team 1'}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6 px-4">
+                      <div className="grid grid-cols-1 gap-2">
+                        {(match.sport === 'cricket' && rosterPlayers.length > 0 ?
+                          rosterPlayers.filter(p => p.team === 'team1') :
+                          participants.filter(p => p.team === 'team1')
+                        ).map((p: any, i: number) => (
+                          <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-muted-foreground/10">
+                            <p className="font-bold text-slate-900 dark:text-slate-100">
+                              {p.playerName || p.name || p.userId}
+                              {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
+                                <span className="ml-2 text-[10px] font-black text-primary border border-primary/30 rounded px-1.5 py-0.5 uppercase tracking-tighter bg-primary/5">
+                                  {p.role === 'captain' && 'C'}
+                                  {p.role === 'wicket-keeper' && 'WK'}
+                                  {p.role === 'captain-wicket-keeper' && 'C & WK'}
+                                </span>
+                              )}
+                            </p>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{p.role === 'player' ? '' : p.role}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Team 2 Squad */}
+                  <Card className="shadow-md overflow-hidden">
+                    <CardHeader className="bg-primary/5 border-b py-4">
+                      <CardTitle className="text-lg font-black flex items-center gap-2 uppercase tracking-wide">
+                        <Users className="h-5 w-5 text-primary" /> {match.team2Name || 'Team 2'}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6 px-4">
+                      <div className="grid grid-cols-1 gap-2">
+                        {(match.sport === 'cricket' && rosterPlayers.length > 0 ?
+                          rosterPlayers.filter(p => p.team === 'team2') :
+                          participants.filter(p => p.team === 'team2')
+                        ).map((p: any, i: number) => (
+                          <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-muted-foreground/10">
+                            <p className="font-bold text-slate-900 dark:text-slate-100">
+                              {p.playerName || p.name || p.userId}
+                              {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
+                                <span className="ml-2 text-[10px] font-black text-primary border border-primary/30 rounded px-1.5 py-0.5 uppercase tracking-tighter bg-primary/5">
+                                  {p.role === 'captain' && 'C'}
+                                  {p.role === 'wicket-keeper' && 'WK'}
+                                  {p.role === 'captain-wicket-keeper' && 'C & WK'}
+                                </span>
+                              )}
+                            </p>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{p.role === 'player' ? '' : p.role}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </TabsContent>
             </Tabs>
           </div>
         )}
 
-        {/* Score Display */}
-        {(match.status === 'live' || match.status === 'completed') && (
+        {/* Scorer component is now inside the tabs for live matches */}
+        {match.status === 'live' && !match.matchData?.inningsData && (
           <div className="mb-6">
             {renderScorer()}
           </div>

@@ -114,6 +114,9 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
   // Man of the match functionality
   const [showManOfMatchDialog, setShowManOfMatchDialog] = useState(false);
   const [selectedManOfMatch, setSelectedManOfMatch] = useState('');
+  const [selectedBestBatsman, setSelectedBestBatsman] = useState('');
+  const [selectedBestBowler, setSelectedBestBowler] = useState('');
+  const [selectedBestFielder, setSelectedBestFielder] = useState('');
   const [manOfMatchSelected, setManOfMatchSelected] = useState(false);
 
   // Match saving functionality
@@ -157,10 +160,41 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
   const maxWickets = 10; // Maximum wickets in an innings
   // Bowling quota constraint removed - bowlers can bowl unlimited overs
 
+  // Helper to determine batting team for a given inning based on toss
+  const getBattingTeamForInning = (inningNum: number): 'team1' | 'team2' => {
+    const toss = match?.matchData?.toss;
+    const tossWinner = toss?.winner || match?.matchData?.tossWinner;
+    const tossDecision = toss?.decision || match?.matchData?.tossDecision;
+
+    if (!tossWinner || !tossDecision) {
+      // Fallback if toss info is missing
+      return inningNum === 1 ? 'team1' : 'team2';
+    }
+
+    const team1Name = match?.team1Name || "Team 1";
+    const tossWinnerIsTeam1 = tossWinner === team1Name;
+
+    if (inningNum === 1) {
+      if (tossDecision === 'bat') {
+        return tossWinnerIsTeam1 ? 'team1' : 'team2';
+      } else {
+        return tossWinnerIsTeam1 ? 'team2' : 'team1';
+      }
+    } else {
+      // Inning 2 is the opposite of Inning 1
+      if (tossDecision === 'bat') {
+        return tossWinnerIsTeam1 ? 'team2' : 'team1';
+      } else {
+        return tossWinnerIsTeam1 ? 'team1' : 'team2';
+      }
+    }
+  };
+
   // Bowler eligibility helper functions
   const getFieldingRoster = () => {
-    // First inning: team2 is fielding, second inning: team1 is fielding
-    const fieldingTeam = currentInning === 1 ? 'team2' : 'team1';
+    // Dynamic fielding team based on toss
+    const battingTeamInCurrentInning = getBattingTeamForInning(currentInning);
+    const fieldingTeam = battingTeamInCurrentInning === 'team1' ? 'team2' : 'team1';
 
     // Filter actual roster players by fielding team
     const filteredPlayers = rosterPlayers.filter((player: any) =>
@@ -211,8 +245,8 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
 
   // Batting roster helper function (similar to fielding roster)
   const getBattingRoster = () => {
-    // First inning: team1 is batting, second inning: team2 is batting
-    const battingTeam = currentInning === 1 ? 'team1' : 'team2';
+    // Dynamic batting team based on toss
+    const battingTeam = getBattingTeamForInning(currentInning);
 
     // Filter actual roster players by batting team and exclude dismissed players
     const filteredPlayers = rosterPlayers.filter((player: any) => {
@@ -1577,6 +1611,12 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
         description: result,
         duration: 10000
       });
+
+      // Notify consumer of match completion
+      updateScore({
+        isMatchCompleted: true,
+        matchResult: result
+      });
     }
   };
 
@@ -1658,13 +1698,14 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
 
   // Function to capture current innings data before resetting
   const captureInningsData = (inningNumber: number) => {
-    const currentBattingTeam = inningNumber === 1 ?
+    const battingTeamKey = getBattingTeamForInning(inningNumber);
+    const currentBattingTeam = battingTeamKey === 'team1' ?
       (match.team1Name || 'Team 1') :
       (match.team2Name || 'Team 2');
 
-    const currentRuns = inningNumber === 1 ? team1Runs : team2Runs;
-    const currentWickets = inningNumber === 1 ? team1Wickets : team2Wickets;
-    const currentBalls = inningNumber === 1 ? team1Balls : team2Balls;
+    const currentRuns = battingTeamKey === 'team1' ? team1Runs : team2Runs;
+    const currentWickets = battingTeamKey === 'team1' ? team1Wickets : team2Wickets;
+    const currentBalls = battingTeamKey === 'team1' ? team1Balls : team2Balls;
 
     const inningData = {
       inningNumber,
@@ -1682,10 +1723,13 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
 
     setInningsData(prev => {
       const filtered = prev.filter(data => data.inningNumber !== inningNumber);
-      return [...filtered, inningData];
-    });
+      const updated = [...filtered, inningData];
 
-    // Removed console.log to prevent potential object rendering issues
+      // Notify parent/server immediately to ensure data persistence
+      updateScore({ inningsData: updated });
+
+      return updated;
+    });
   };
 
   const switchInnings = () => {
@@ -1770,7 +1814,17 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
           bowler: currentBowler
         },
         battingStats,
-        bowlingStats
+        bowlingStats,
+        inningsData: overrides.inningsData ?? inningsData,
+        isMatchCompleted: overrides.isMatchCompleted ?? isMatchCompleted,
+        matchResult: overrides.matchResult ?? matchResult,
+        manOfMatchSelected: overrides.manOfMatchSelected ?? manOfMatchSelected,
+        selectedManOfMatch: overrides.selectedManOfMatch ?? selectedManOfMatch,
+        selectedBestBatsman: overrides.selectedBestBatsman ?? selectedBestBatsman,
+        selectedBestBowler: overrides.selectedBestBowler ?? selectedBestBowler,
+        selectedBestFielder: overrides.selectedBestFielder ?? selectedBestFielder,
+        tossWinner: match.matchData?.tossWinner,
+        tossDecision: match.matchData?.tossDecision
       },
     };
     onScoreUpdate(scoreData);
@@ -1998,7 +2052,10 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
             sixes: batter.sixes,
             isOut: batter.isDismissed,
             dismissalType: batter.dismissalType,
-            manOfMatch: manOfMatchSelected && selectedManOfMatch === batter.name
+            manOfMatch: manOfMatchSelected && selectedManOfMatch === batter.name,
+            bestBatsman: selectedBestBatsman === batter.name,
+            bestBowler: selectedBestBowler === batter.name,
+            bestFielder: selectedBestFielder === batter.name
           });
         } else if (player && !player.id) {
           console.warn(`⚠️ Skipping player ${batter.name} - missing player ID in roster`);
@@ -2028,7 +2085,10 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
               runsGiven: bowler.runsConceded,
               wicketsTaken: bowler.wickets,
               maidens: bowler.maidenOvers,
-              manOfMatch: manOfMatchSelected && selectedManOfMatch === bowler.name
+              manOfMatch: manOfMatchSelected && selectedManOfMatch === bowler.name,
+              bestBatsman: selectedBestBatsman === bowler.name,
+              bestBowler: selectedBestBowler === bowler.name,
+              bestFielder: selectedBestFielder === bowler.name
             });
           }
         } else if (player && !player.id) {
@@ -2154,8 +2214,11 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
       const completionData = {
         matchId: match.id,
         finalScorecard,
-        awards: manOfMatchSelected && selectedManOfMatch ? {
-          manOfTheMatch: getAllPlayers().find(p => (p.name || p.playerName) === selectedManOfMatch)?.id
+        awards: (selectedManOfMatch || selectedBestBatsman || selectedBestBowler || selectedBestFielder) ? {
+          manOfTheMatch: getAllPlayers().find(p => (p.name || p.playerName) === selectedManOfMatch)?.id,
+          bestBatsman: getAllPlayers().find(p => (p.name || p.playerName) === selectedBestBatsman)?.id,
+          bestBowler: getAllPlayers().find(p => (p.name || p.playerName) === selectedBestBowler)?.id,
+          bestFielder: getAllPlayers().find(p => (p.name || p.playerName) === selectedBestFielder)?.id,
         } : undefined,
         resultSummary: {
           winnerId,
@@ -2708,52 +2771,76 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {currentInning === 1 && battingStats.length > 0 ? (
-                    battingStats.map((player, index) => (
-                      <TableRow
-                        key={index}
-                        className={
-                          player.isDismissed
-                            ? "bg-red-50 dark:bg-red-900/20 opacity-75"
-                            : currentStriker === player.name
-                              ? "bg-blue-100 dark:bg-blue-900/30"
-                              : ""
-                        }
-                        data-testid={`team1-batting-row-${player.name.replace(/\s+/g, '-').toLowerCase()}`}
-                      >
-                        <TableCell className="font-medium">
-                          {player.name}
-                          {player.isDismissed && (
-                            <Badge variant="destructive" className="ml-2 text-xs">
-                              Out
-                            </Badge>
-                          )}
-                          {currentStriker === player.name && !player.isDismissed && (
-                            <Badge variant="default" className="ml-2 text-xs bg-blue-600">
-                              Striker
-                            </Badge>
-                          )}
-                          {currentNonStriker === player.name && !player.isDismissed && (
-                            <Badge variant="outline" className="ml-2 text-xs">
-                              Non-Striker
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center font-semibold text-green-600">{player.runs}</TableCell>
-                        <TableCell className="text-center">{player.balls}</TableCell>
-                        <TableCell className="text-center text-gray-600">{player.dots}</TableCell>
-                        <TableCell className="text-center text-blue-600 font-semibold">{player.fours}</TableCell>
-                        <TableCell className="text-center text-yellow-600 font-semibold">{player.sixes}</TableCell>
-                        <TableCell className="text-center font-medium">{player.strikeRate.toFixed(1)}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
-                        {currentInning === 1 ? "No batting statistics yet" : "Team completed batting"}
-                      </TableCell>
-                    </TableRow>
-                  )}
+                  {(() => {
+                    const isTeam1Batting = getBattingTeamForInning(currentInning) === 'team1';
+                    const team1Innings = inningsData.filter(inn => inn.battingTeam === (match.team1Name || "Team A"));
+                    const hasFinishedBatting = currentInning > (team1Innings[0]?.inningNumber || 0) && team1Innings.length > 0;
+
+                    if (isTeam1Batting && battingStats.length > 0) {
+                      return battingStats.map((player, index) => (
+                        <TableRow
+                          key={index}
+                          className={
+                            player.isDismissed
+                              ? "bg-red-50 dark:bg-red-900/20 opacity-75"
+                              : currentStriker === player.name
+                                ? "bg-blue-100 dark:bg-blue-900/30"
+                                : ""
+                          }
+                          data-testid={`team1-batting-row-${player.name.replace(/\s+/g, '-').toLowerCase()}`}
+                        >
+                          <TableCell className="font-medium">
+                            {player.name}
+                            {player.isDismissed && (
+                              <Badge variant="destructive" className="ml-2 text-xs">
+                                Out
+                              </Badge>
+                            )}
+                            {currentStriker === player.name && !player.isDismissed && (
+                              <Badge variant="default" className="ml-2 text-xs bg-blue-600">
+                                Striker
+                              </Badge>
+                            )}
+                            {currentNonStriker === player.name && !player.isDismissed && (
+                              <Badge variant="outline" className="ml-2 text-xs">
+                                Non-Striker
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center font-semibold text-green-600">{player.runs}</TableCell>
+                          <TableCell className="text-center">{player.balls}</TableCell>
+                          <TableCell className="text-center text-gray-600">{player.dots}</TableCell>
+                          <TableCell className="text-center text-blue-600 font-semibold">{player.fours}</TableCell>
+                          <TableCell className="text-center text-yellow-600 font-semibold">{player.sixes}</TableCell>
+                          <TableCell className="text-center font-medium">{player.strikeRate.toFixed(1)}</TableCell>
+                        </TableRow>
+                      ));
+                    } else if (team1Innings.length > 0) {
+                      // Show completed innings data
+                      return team1Innings[0].batsmen.map((player, index) => (
+                        <TableRow key={index} className="opacity-75">
+                          <TableCell className="font-medium">
+                            {player.name}
+                            {player.isDismissed && <Badge variant="destructive" className="ml-2 text-xs">Out</Badge>}
+                          </TableCell>
+                          <TableCell className="text-center font-semibold text-green-600">{player.runs}</TableCell>
+                          <TableCell className="text-center">{player.balls}</TableCell>
+                          <TableCell className="text-center text-gray-600">{player.dots}</TableCell>
+                          <TableCell className="text-center text-blue-600 font-semibold">{player.fours}</TableCell>
+                          <TableCell className="text-center text-yellow-600 font-semibold">{player.sixes}</TableCell>
+                          <TableCell className="text-center font-medium">{player.strikeRate.toFixed(1)}</TableCell>
+                        </TableRow>
+                      ));
+                    } else {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
+                            {isTeam1Batting ? "No batting statistics yet" : "Team has not batted yet"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                  })()}
                 </TableBody>
               </Table>
             </CardContent>
@@ -2783,52 +2870,74 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {currentInning === 2 && battingStats.length > 0 ? (
-                    battingStats.map((player, index) => (
-                      <TableRow
-                        key={index}
-                        className={
-                          player.isDismissed
-                            ? "bg-red-50 dark:bg-red-900/20 opacity-75"
-                            : currentStriker === player.name
-                              ? "bg-green-100 dark:bg-green-900/30"
-                              : ""
-                        }
-                        data-testid={`team2-batting-row-${player.name.replace(/\s+/g, '-').toLowerCase()}`}
-                      >
-                        <TableCell className="font-medium">
-                          {player.name}
-                          {player.isDismissed && (
-                            <Badge variant="destructive" className="ml-2 text-xs">
-                              Out
-                            </Badge>
-                          )}
-                          {currentStriker === player.name && !player.isDismissed && (
-                            <Badge variant="default" className="ml-2 text-xs bg-green-600">
-                              Striker
-                            </Badge>
-                          )}
-                          {currentNonStriker === player.name && !player.isDismissed && (
-                            <Badge variant="outline" className="ml-2 text-xs">
-                              Non-Striker
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center font-semibold text-green-600">{player.runs}</TableCell>
-                        <TableCell className="text-center">{player.balls}</TableCell>
-                        <TableCell className="text-center text-gray-600">{player.dots}</TableCell>
-                        <TableCell className="text-center text-blue-600 font-semibold">{player.fours}</TableCell>
-                        <TableCell className="text-center text-yellow-600 font-semibold">{player.sixes}</TableCell>
-                        <TableCell className="text-center font-medium">{player.strikeRate.toFixed(1)}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
-                        {currentInning === 2 ? "No batting statistics yet" : "Team has not batted yet"}
-                      </TableCell>
-                    </TableRow>
-                  )}
+                  {(() => {
+                    const isTeam2Batting = getBattingTeamForInning(currentInning) === 'team2';
+                    const team2Innings = inningsData.filter(inn => inn.battingTeam === (match.team2Name || "Team B"));
+
+                    if (isTeam2Batting && battingStats.length > 0) {
+                      return battingStats.map((player, index) => (
+                        <TableRow
+                          key={index}
+                          className={
+                            player.isDismissed
+                              ? "bg-red-50 dark:bg-red-900/20 opacity-75"
+                              : currentStriker === player.name
+                                ? "bg-green-100 dark:bg-green-900/30"
+                                : ""
+                          }
+                          data-testid={`team2-batting-row-${player.name.replace(/\s+/g, '-').toLowerCase()}`}
+                        >
+                          <TableCell className="font-medium">
+                            {player.name}
+                            {player.isDismissed && (
+                              <Badge variant="destructive" className="ml-2 text-xs">
+                                Out
+                              </Badge>
+                            )}
+                            {currentStriker === player.name && !player.isDismissed && (
+                              <Badge variant="default" className="ml-2 text-xs bg-green-600">
+                                Striker
+                              </Badge>
+                            )}
+                            {currentNonStriker === player.name && !player.isDismissed && (
+                              <Badge variant="outline" className="ml-2 text-xs">
+                                Non-Striker
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center font-semibold text-green-600">{player.runs}</TableCell>
+                          <TableCell className="text-center">{player.balls}</TableCell>
+                          <TableCell className="text-center text-gray-600">{player.dots}</TableCell>
+                          <TableCell className="text-center text-blue-600 font-semibold">{player.fours}</TableCell>
+                          <TableCell className="text-center text-yellow-600 font-semibold">{player.sixes}</TableCell>
+                          <TableCell className="text-center font-medium">{player.strikeRate.toFixed(1)}</TableCell>
+                        </TableRow>
+                      ));
+                    } else if (team2Innings.length > 0) {
+                      return team2Innings[0].batsmen.map((player, index) => (
+                        <TableRow key={index} className="opacity-75">
+                          <TableCell className="font-medium">
+                            {player.name}
+                            {player.isDismissed && <Badge variant="destructive" className="ml-2 text-xs">Out</Badge>}
+                          </TableCell>
+                          <TableCell className="text-center font-semibold text-green-600">{player.runs}</TableCell>
+                          <TableCell className="text-center">{player.balls}</TableCell>
+                          <TableCell className="text-center text-gray-600">{player.dots}</TableCell>
+                          <TableCell className="text-center text-blue-600 font-semibold">{player.fours}</TableCell>
+                          <TableCell className="text-center text-yellow-600 font-semibold">{player.sixes}</TableCell>
+                          <TableCell className="text-center font-medium">{player.strikeRate.toFixed(1)}</TableCell>
+                        </TableRow>
+                      ));
+                    } else {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
+                            {isTeam2Batting ? "No batting statistics yet" : "Team has not batted yet"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                  })()}
                 </TableBody>
               </Table>
             </CardContent>
@@ -2855,36 +2964,56 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {currentInning === 2 && bowlingStats.length > 0 ? (
-                    bowlingStats.map((player, index) => (
-                      <TableRow
-                        key={index}
-                        className={currentBowler === player.name ? "bg-orange-100 dark:bg-orange-900/30" : ""}
-                        data-testid={`team1-bowling-row-${player.name.replace(/\s+/g, '-').toLowerCase()}`}
-                      >
-                        <TableCell className="font-medium">
-                          {player.name}
-                          {currentBowler === player.name && (
-                            <Badge variant="default" className="ml-2 text-xs bg-orange-600">
-                              Bowling
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">{player.oversBowled}</TableCell>
-                        <TableCell className="text-center font-semibold text-red-600">{player.wickets}</TableCell>
-                        <TableCell className="text-center">{player.runsConceded}</TableCell>
-                        <TableCell className="text-center">{player.maidenOvers}</TableCell>
-                        <TableCell className="text-center font-medium">{player.economyRate.toFixed(2)}</TableCell>
-                        <TableCell className="text-center">{player.bowlingAverage > 0 ? player.bowlingAverage.toFixed(2) : '-'}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
-                        {currentInning === 2 ? "No bowling statistics yet" : "Team has not bowled yet"}
-                      </TableCell>
-                    </TableRow>
-                  )}
+                  {(() => {
+                    const battingTeamCurrent = getBattingTeamForInning(currentInning);
+                    const isTeam1Bowling = battingTeamCurrent === 'team2';
+                    const team1BowlingInnings = inningsData.filter(inn => inn.battingTeam === (match.team2Name || "Team B"));
+
+                    if (isTeam1Bowling && bowlingStats.length > 0) {
+                      return bowlingStats.map((player, index) => (
+                        <TableRow
+                          key={index}
+                          className={currentBowler === player.name ? "bg-orange-100 dark:bg-orange-900/30" : ""}
+                          data-testid={`team1-bowling-row-${player.name.replace(/\s+/g, '-').toLowerCase()}`}
+                        >
+                          <TableCell className="font-medium">
+                            {player.name}
+                            {currentBowler === player.name && (
+                              <Badge variant="default" className="ml-2 text-xs bg-orange-600">
+                                Bowling
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">{player.oversBowled}</TableCell>
+                          <TableCell className="text-center font-semibold text-red-600">{player.wickets}</TableCell>
+                          <TableCell className="text-center">{player.runsConceded}</TableCell>
+                          <TableCell className="text-center">{player.maidenOvers}</TableCell>
+                          <TableCell className="text-center font-medium">{player.economyRate.toFixed(2)}</TableCell>
+                          <TableCell className="text-center">{player.bowlingAverage > 0 ? player.bowlingAverage.toFixed(2) : '-'}</TableCell>
+                        </TableRow>
+                      ));
+                    } else if (team1BowlingInnings.length > 0) {
+                      return team1BowlingInnings[0].bowlers.map((player, index) => (
+                        <TableRow key={index} className="opacity-75">
+                          <TableCell className="font-medium">{player.name}</TableCell>
+                          <TableCell className="text-center">{player.oversBowled}</TableCell>
+                          <TableCell className="text-center font-semibold text-red-600">{player.wickets}</TableCell>
+                          <TableCell className="text-center">{player.runsConceded}</TableCell>
+                          <TableCell className="text-center">{player.maidenOvers}</TableCell>
+                          <TableCell className="text-center font-medium">{player.economyRate.toFixed(2)}</TableCell>
+                          <TableCell className="text-center">{player.bowlingAverage > 0 ? player.bowlingAverage.toFixed(2) : '-'}</TableCell>
+                        </TableRow>
+                      ));
+                    } else {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
+                            {isTeam1Bowling ? "No bowling statistics yet" : "Team has not bowled yet"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                  })()}
                 </TableBody>
               </Table>
             </CardContent>
@@ -2911,36 +3040,56 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {currentInning === 1 && bowlingStats.length > 0 ? (
-                    bowlingStats.map((player, index) => (
-                      <TableRow
-                        key={index}
-                        className={currentBowler === player.name ? "bg-purple-100 dark:bg-purple-900/30" : ""}
-                        data-testid={`team2-bowling-row-${player.name.replace(/\s+/g, '-').toLowerCase()}`}
-                      >
-                        <TableCell className="font-medium">
-                          {player.name}
-                          {currentBowler === player.name && (
-                            <Badge variant="default" className="ml-2 text-xs bg-purple-600">
-                              Bowling
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">{player.oversBowled}</TableCell>
-                        <TableCell className="text-center font-semibold text-red-600">{player.wickets}</TableCell>
-                        <TableCell className="text-center">{player.runsConceded}</TableCell>
-                        <TableCell className="text-center">{player.maidenOvers}</TableCell>
-                        <TableCell className="text-center font-medium">{player.economyRate.toFixed(2)}</TableCell>
-                        <TableCell className="text-center">{player.bowlingAverage > 0 ? player.bowlingAverage.toFixed(2) : '-'}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
-                        {currentInning === 1 ? "No bowling statistics yet" : "Team has completed bowling"}
-                      </TableCell>
-                    </TableRow>
-                  )}
+                  {(() => {
+                    const battingTeamCurrent = getBattingTeamForInning(currentInning);
+                    const isTeam2Bowling = battingTeamCurrent === 'team1';
+                    const team2BowlingInnings = inningsData.filter(inn => inn.battingTeam === (match.team1Name || "Team A"));
+
+                    if (isTeam2Bowling && bowlingStats.length > 0) {
+                      return bowlingStats.map((player, index) => (
+                        <TableRow
+                          key={index}
+                          className={currentBowler === player.name ? "bg-purple-100 dark:bg-purple-900/30" : ""}
+                          data-testid={`team2-bowling-row-${player.name.replace(/\s+/g, '-').toLowerCase()}`}
+                        >
+                          <TableCell className="font-medium">
+                            {player.name}
+                            {currentBowler === player.name && (
+                              <Badge variant="default" className="ml-2 text-xs bg-purple-600">
+                                Bowling
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">{player.oversBowled}</TableCell>
+                          <TableCell className="text-center font-semibold text-red-600">{player.wickets}</TableCell>
+                          <TableCell className="text-center">{player.runsConceded}</TableCell>
+                          <TableCell className="text-center">{player.maidenOvers}</TableCell>
+                          <TableCell className="text-center font-medium">{player.economyRate.toFixed(2)}</TableCell>
+                          <TableCell className="text-center">{player.bowlingAverage > 0 ? player.bowlingAverage.toFixed(2) : '-'}</TableCell>
+                        </TableRow>
+                      ));
+                    } else if (team2BowlingInnings.length > 0) {
+                      return team2BowlingInnings[0].bowlers.map((player, index) => (
+                        <TableRow key={index} className="opacity-75">
+                          <TableCell className="font-medium">{player.name}</TableCell>
+                          <TableCell className="text-center">{player.oversBowled}</TableCell>
+                          <TableCell className="text-center font-semibold text-red-600">{player.wickets}</TableCell>
+                          <TableCell className="text-center">{player.runsConceded}</TableCell>
+                          <TableCell className="text-center">{player.maidenOvers}</TableCell>
+                          <TableCell className="text-center font-medium">{player.economyRate.toFixed(2)}</TableCell>
+                          <TableCell className="text-center">{player.bowlingAverage > 0 ? player.bowlingAverage.toFixed(2) : '-'}</TableCell>
+                        </TableRow>
+                      ));
+                    } else {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
+                            {isTeam2Bowling ? "No bowling statistics yet" : "Team has not bowled yet"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                  })()}
                 </TableBody>
               </Table>
             </CardContent>
@@ -4038,7 +4187,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
               </p>
 
               <div className="space-y-2">
-                <Label htmlFor="man-of-match" className="font-medium">Player:</Label>
+                <Label htmlFor="man-of-match" className="font-medium">Man of the Match:</Label>
                 <Select value={selectedManOfMatch} onValueChange={setSelectedManOfMatch}>
                   <SelectTrigger data-testid="select-man-of-match">
                     <SelectValue placeholder="Select Man of the Match" />
@@ -4051,9 +4200,69 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                         <SelectItem key={player.id || `motm-${index}`} value={playerName || `player-${index}`}>
                           {playerName}
                           <span className="ml-2 text-xs text-muted-foreground">({teamName})</span>
-                          {player.role && player.role !== 'player' && (
-                            <span className="ml-1 text-xs text-muted-foreground">[{player.role}]</span>
-                          )}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="best-batsman" className="font-medium">Best Batsman:</Label>
+                <Select value={selectedBestBatsman} onValueChange={setSelectedBestBatsman}>
+                  <SelectTrigger data-testid="select-best-batsman">
+                    <SelectValue placeholder="Select Best Batsman" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAllPlayers().map((player: any, index: number) => {
+                      const playerName = (player.name || player.playerName)?.trim();
+                      const teamName = player.team === 'team1' ? (match.team1Name || 'Team A') : (match.team2Name || 'Team B');
+                      return (
+                        <SelectItem key={player.id || `batsman-${index}`} value={playerName || `player-${index}`}>
+                          {playerName}
+                          <span className="ml-2 text-xs text-muted-foreground">({teamName})</span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="best-bowler" className="font-medium">Best Bowler:</Label>
+                <Select value={selectedBestBowler} onValueChange={setSelectedBestBowler}>
+                  <SelectTrigger data-testid="select-best-bowler">
+                    <SelectValue placeholder="Select Best Bowler" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAllPlayers().map((player: any, index: number) => {
+                      const playerName = (player.name || player.playerName)?.trim();
+                      const teamName = player.team === 'team1' ? (match.team1Name || 'Team A') : (match.team2Name || 'Team B');
+                      return (
+                        <SelectItem key={player.id || `bowler-${index}`} value={playerName || `player-${index}`}>
+                          {playerName}
+                          <span className="ml-2 text-xs text-muted-foreground">({teamName})</span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="best-fielder" className="font-medium">Best Fielder:</Label>
+                <Select value={selectedBestFielder} onValueChange={setSelectedBestFielder}>
+                  <SelectTrigger data-testid="select-best-fielder">
+                    <SelectValue placeholder="Select Best Fielder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAllPlayers().map((player: any, index: number) => {
+                      const playerName = (player.name || player.playerName)?.trim();
+                      const teamName = player.team === 'team1' ? (match.team1Name || 'Team A') : (match.team2Name || 'Team B');
+                      return (
+                        <SelectItem key={player.id || `fielder-${index}`} value={playerName || `player-${index}`}>
+                          {playerName}
+                          <span className="ml-2 text-xs text-muted-foreground">({teamName})</span>
                         </SelectItem>
                       );
                     })}
@@ -4079,31 +4288,31 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
               </Button>
               <Button
                 onClick={() => {
-                  if (!selectedManOfMatch.trim()) {
-                    toast({
-                      title: "Player Required",
-                      description: "Please select a player for Man of the Match.",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-
-                  // Complete match with man of the match
+                  // Complete match with awards
                   setShowManOfMatchDialog(false);
                   setIsMatchCompleted(true);
-                  setManOfMatchSelected(true);
+                  if (selectedManOfMatch) setManOfMatchSelected(true);
+
+                  // Trigger broadcast of awards
+                  updateScore({
+                    isMatchCompleted: true,
+                    selectedManOfMatch,
+                    selectedBestBatsman,
+                    selectedBestBowler,
+                    selectedBestFielder,
+                    manOfMatchSelected: !!selectedManOfMatch
+                  });
 
                   toast({
-                    title: "🏆 Man of the Match",
-                    description: `${selectedManOfMatch} selected as Man of the Match!`,
+                    title: "🏆 Match Awards Selected",
+                    description: "Achievements have been saved and shared.",
                     duration: 5000
                   });
                 }}
-                disabled={!selectedManOfMatch.trim()}
                 className="flex-1 bg-yellow-600 hover:bg-yellow-700"
                 data-testid="button-confirm-man-of-match"
               >
-                Confirm Selection
+                Confirm Achievements
               </Button>
             </div>
           </div>
@@ -4156,18 +4365,40 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                         </CardContent>
                       </Card>
 
-                      {manOfMatchSelected && selectedManOfMatch && (
+                      {(selectedManOfMatch || selectedBestBatsman || selectedBestBowler || selectedBestFielder) && (
                         <Card className="bg-gradient-to-r from-yellow-400/10 to-orange-400/10 border-yellow-400/30">
                           <CardHeader className="pb-2 text-center">
                             <CardTitle className="text-sm font-bold text-yellow-800 dark:text-yellow-200 uppercase tracking-wider">
-                              🏆 Man of the Match
+                              🏆 Match Achievements
                             </CardTitle>
                           </CardHeader>
-                          <CardContent className="text-center">
-                            <p className="text-2xl font-black text-orange-700 dark:text-orange-400 drop-shadow-sm">
-                              {selectedManOfMatch}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">Outstanding Achievement</p>
+                          <CardContent className="space-y-4">
+                            {selectedManOfMatch && (
+                              <div className="text-center">
+                                <p className="text-xs text-muted-foreground uppercase tracking-widest font-black mb-1">Man of the Match</p>
+                                <p className="text-xl font-black text-orange-700 dark:text-orange-400 drop-shadow-sm">{selectedManOfMatch}</p>
+                              </div>
+                            )}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t pt-4 border-yellow-400/20">
+                              {selectedBestBatsman && (
+                                <div className="text-center">
+                                  <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Best Batsman</p>
+                                  <p className="text-sm font-black text-slate-800 dark:text-slate-200">{selectedBestBatsman}</p>
+                                </div>
+                              )}
+                              {selectedBestBowler && (
+                                <div className="text-center">
+                                  <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Best Bowler</p>
+                                  <p className="text-sm font-black text-slate-800 dark:text-slate-200">{selectedBestBowler}</p>
+                                </div>
+                              )}
+                              {selectedBestFielder && (
+                                <div className="text-center">
+                                  <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Best Fielder</p>
+                                  <p className="text-sm font-black text-slate-800 dark:text-slate-200">{selectedBestFielder}</p>
+                                </div>
+                              )}
+                            </div>
                           </CardContent>
                         </Card>
                       )}
@@ -4180,7 +4411,7 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                         className="w-full border-yellow-400/50 hover:bg-yellow-400/10"
                         data-testid="button-select-man-of-match-main"
                       >
-                        🏆 Select Man of the Match
+                        🏆 Select Match Achievements
                       </Button>
                     )}
                   </TabsContent>
