@@ -829,6 +829,7 @@ export class MongoStorage implements IStorage {
         bestBatsmanAwards: 0,
         bestBowlerAwards: 0,
         bestFielderAwards: 0,
+        processedMatches: [],
       },
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -950,6 +951,7 @@ export class MongoStorage implements IStorage {
         bestBatsmanAwards: 0,
         bestBowlerAwards: 0,
         bestFielderAwards: 0,
+        processedMatches: [],
       },
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -1307,6 +1309,7 @@ export class MongoStorage implements IStorage {
             bestBatsmanAwards: targetStats.bestBatsmanAwards + sourceStats.bestBatsmanAwards,
             bestBowlerAwards: targetStats.bestBowlerAwards + sourceStats.bestBowlerAwards,
             bestFielderAwards: targetStats.bestFielderAwards + sourceStats.bestFielderAwards,
+            processedMatches: [...(targetStats.processedMatches || []), ...(sourceStats.processedMatches || [])],
           };
 
           // Recalculate averages
@@ -1928,7 +1931,8 @@ export class MongoStorage implements IStorage {
           const performanceId = `perf-${this.generateId()}`;
           const isTeam1 = playerStat.teamId === matchData.team1Id;
           const oppositionName = isTeam1 ? matchData.team2Name : matchData.team1Name;
-          const teamName = isTeam1 ? matchData.team1Name : matchData.team2Name;
+          // Fetch current player to check for idempotency
+          const currentPlayer = await this.getPlayer(playerStat.playerId);
 
           const performance: PlayerPerformance = {
             id: performanceId,
@@ -1936,7 +1940,7 @@ export class MongoStorage implements IStorage {
             userId: null, // Will be linked if possible
             matchId: matchData.matchId,
             teamId: playerStat.teamId || null,
-            teamName: teamName || null,
+            teamName: (isTeam1 ? matchData.team1Name : matchData.team2Name) || null,
             opposition: oppositionName || "Opposition",
             venue: updatedMatch?.venueId || null,
             matchDate: updatedMatch?.scheduledAt || new Date(),
@@ -1978,6 +1982,15 @@ export class MongoStorage implements IStorage {
           if (playerStat.bestBowler) performance.awards.push('best-bowler');
           if (playerStat.bestFielder) performance.awards.push('best-fielder');
 
+          // Check if this match has already been processed for this player to ensure idempotency
+          if (currentPlayer && currentPlayer.careerStats?.processedMatches?.includes(matchData.matchId)) {
+            console.log(`⚠️ STORAGE: Match ${matchData.matchId} already processed for player ${playerStat.playerId}, skipping career stats update`);
+
+            // Still insert performance but skip career stats increment
+            await this.db.collection('playerPerformances').insertOne(performance as any, { session });
+            continue;
+          }
+
           // Increment career stats
           const incrementFields: any = {
             'careerStats.totalMatches': 1
@@ -2016,8 +2029,7 @@ export class MongoStorage implements IStorage {
 
           // Update highest score if needed
           const updateFields: any = { updatedAt: new Date() };
-          // Fetch player details for career stats and userId
-          const currentPlayer = await this.players.findOne({ id: playerStat.playerId }, { session });
+          // Use the already fetched currentPlayer for career stats check
           if (currentPlayer) {
             if (playerStat.runsScored && playerStat.runsScored > (currentPlayer.careerStats?.highestScore || 0)) {
               updateFields['careerStats.highestScore'] = playerStat.runsScored;
@@ -2034,7 +2046,8 @@ export class MongoStorage implements IStorage {
               { id: playerStat.playerId },
               {
                 $inc: incrementFields,
-                $set: updateFields
+                $set: updateFields,
+                $addToSet: { 'careerStats.processedMatches': matchData.matchId } as any
               },
               { session }
             )
@@ -2184,6 +2197,14 @@ export class MongoStorage implements IStorage {
             }
 
             console.log(`✅ Found player: [REDACTED] (ID: ${player.id})`);
+
+            // Idempotency check: Skip if match already processed
+            if (player.careerStats?.processedMatches?.includes(matchId)) {
+              console.log(`⚠️ ${playerLogId}: Match ${matchId} already processed, skipping career stats update`);
+              updatedPlayerIds.push(player.id); // Add to recalculation just in case, but skip update
+              continue;
+            }
+
             if (process.env.LOG_LEVEL === 'debug') {
               console.log(`📈 Current career stats before update:`, player.careerStats || {});
             }
@@ -2208,7 +2229,10 @@ export class MongoStorage implements IStorage {
               },
               $set: {
                 updatedAt: new Date()
-              }
+              },
+              $addToSet: {
+                'careerStats.processedMatches': matchId
+              } as any
             };
 
             // Handle centuries and half-centuries

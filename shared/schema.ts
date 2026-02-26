@@ -1013,6 +1013,7 @@ export type Player = {
     bestBatsmanAwards: number;
     bestBowlerAwards: number;
     bestFielderAwards: number;
+    processedMatches: string[]; // Track match IDs to ensure idempotency
   };
 
   createdAt: Date | null;

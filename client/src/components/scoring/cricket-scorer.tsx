@@ -4565,22 +4565,33 @@ export default function CricketScorer({ match, onScoreUpdate, isLive, rosterPlay
                 <div className="flex gap-3">
                   {!isMatchSaved && (
                     <Button
-                      onClick={handleSaveMatch}
-                      disabled={isSavingMatch}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold"
-                      data-testid="button-save-match"
+                      onClick={async () => {
+                        await handleSaveMatch();
+                        // Automatically save player profiles after match is saved
+                        if (!isPlayerProfilesSaved) {
+                          await handleSavePlayerProfiles();
+                        }
+                      }}
+                      disabled={isSavingMatch || isSavingPlayerProfiles}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold h-12 shadow-lg hover:shadow-xl transition-all"
+                      data-testid="button-save-all"
                     >
-                      {isSavingMatch ? "Saving..." : "💾 Save Match"}
+                      {isSavingMatch || isSavingPlayerProfiles ? (
+                        <span className="flex items-center gap-2">
+                          <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                          Saving Results...
+                        </span>
+                      ) : "💾 Save Match & Synchronize Profiles"}
                     </Button>
                   )}
-                  {!isPlayerProfilesSaved && (
+                  {isMatchSaved && !isPlayerProfilesSaved && (
                     <Button
                       onClick={handleSavePlayerProfiles}
                       disabled={isSavingPlayerProfiles}
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold"
-                      data-testid="button-save-player-profiles"
+                      data-testid="button-save-player-profiles-retry"
                     >
-                      {isSavingPlayerProfiles ? "Saving..." : "👤 Save Player Profiles"}
+                      {isSavingPlayerProfiles ? "Saving Profiles..." : "👤 Synchronize Player Profiles"}
                     </Button>
                   )}
                 </div>
