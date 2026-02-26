@@ -324,7 +324,7 @@ export default function MatchSpectator() {
 
             {/* Detailed Results Tabs */}
             <Tabs defaultValue={match.status === 'live' ? "live-score" : "overview"} className="w-full">
-              <TabsList className="grid w-full grid-cols-4 lg:w-[600px] mx-auto mb-8 bg-muted/50 p-1">
+              <TabsList className="grid w-full grid-cols-5 lg:w-[750px] mx-auto mb-8 bg-muted/50 p-1">
                 <TabsTrigger value="overview" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Overview</TabsTrigger>
                 {match.status === 'live' && (
                   <TabsTrigger value="live-score" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Live Score</TabsTrigger>
@@ -480,72 +480,6 @@ export default function MatchSpectator() {
                 )}
               </TabsContent>
 
-              <TabsContent value="squads" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Team 1 Squad */}
-                  <Card className="shadow-md overflow-hidden">
-                    <CardHeader className="bg-primary/5 border-b py-4">
-                      <CardTitle className="text-lg font-black flex items-center gap-2 uppercase tracking-wide">
-                        <Users className="h-5 w-5 text-primary" /> {match.team1Name || 'Team 1'}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6 px-4">
-                      <div className="grid grid-cols-1 gap-2">
-                        {(match.sport === 'cricket' && rosterPlayers.length > 0 ?
-                          rosterPlayers.filter(p => p.team === 'team1') :
-                          participants.filter(p => p.team === 'team1')
-                        ).map((p: any, i: number) => (
-                          <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-muted-foreground/10">
-                            <p className="font-bold text-slate-900 dark:text-slate-100">
-                              {p.playerName || p.name || p.userId}
-                              {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
-                                <span className="ml-2 text-[10px] font-black text-primary border border-primary/30 rounded px-1.5 py-0.5 uppercase tracking-tighter bg-primary/5">
-                                  {p.role === 'captain' && 'C'}
-                                  {p.role === 'wicket-keeper' && 'WK'}
-                                  {p.role === 'captain-wicket-keeper' && 'C & WK'}
-                                </span>
-                              )}
-                            </p>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{p.role === 'player' ? '' : p.role}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Team 2 Squad */}
-                  <Card className="shadow-md overflow-hidden">
-                    <CardHeader className="bg-primary/5 border-b py-4">
-                      <CardTitle className="text-lg font-black flex items-center gap-2 uppercase tracking-wide">
-                        <Users className="h-5 w-5 text-primary" /> {match.team2Name || 'Team 2'}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6 px-4">
-                      <div className="grid grid-cols-1 gap-2">
-                        {(match.sport === 'cricket' && rosterPlayers.length > 0 ?
-                          rosterPlayers.filter(p => p.team === 'team2') :
-                          participants.filter(p => p.team === 'team2')
-                        ).map((p: any, i: number) => (
-                          <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-muted-foreground/10">
-                            <p className="font-bold text-slate-900 dark:text-slate-100">
-                              {p.playerName || p.name || p.userId}
-                              {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
-                                <span className="ml-2 text-[10px] font-black text-primary border border-primary/30 rounded px-1.5 py-0.5 uppercase tracking-tighter bg-primary/5">
-                                  {p.role === 'captain' && 'C'}
-                                  {p.role === 'wicket-keeper' && 'WK'}
-                                  {p.role === 'captain-wicket-keeper' && 'C & WK'}
-                                </span>
-                              )}
-                            </p>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{p.role === 'player' ? '' : p.role}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
               <TabsContent value="achievements" className="space-y-6">
                 <div className="max-w-4xl mx-auto space-y-8">
                   <Card className="shadow-md overflow-hidden">
@@ -621,21 +555,34 @@ export default function MatchSpectator() {
                         {(match.sport === 'cricket' && rosterPlayers.length > 0 ?
                           rosterPlayers.filter(p => p.team === 'team1') :
                           participants.filter(p => p.team === 'team1')
-                        ).map((p: any, i: number) => (
-                          <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-muted-foreground/10">
-                            <p className="font-bold text-slate-900 dark:text-slate-100">
-                              {p.playerName || p.name || p.userId}
-                              {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
-                                <span className="ml-2 text-[10px] font-black text-primary border border-primary/30 rounded px-1.5 py-0.5 uppercase tracking-tighter bg-primary/5">
-                                  {p.role === 'captain' && 'C'}
-                                  {p.role === 'wicket-keeper' && 'WK'}
-                                  {p.role === 'captain-wicket-keeper' && 'C & WK'}
-                                </span>
-                              )}
-                            </p>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{p.role === 'player' ? '' : p.role}</span>
-                          </div>
-                        ))}
+                        ).map((p: any, i: number) => {
+                          const playerId = p.id || p.playerId || p.userId;
+                          const playerName = p.playerName || p.name || p.userId;
+
+                          return (
+                            <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-muted-foreground/10">
+                              <div className="flex items-center gap-2">
+                                {playerId ? (
+                                  <Link href={`/players/${playerId}`} className="font-bold text-slate-900 dark:text-slate-100 hover:text-primary transition-colors cursor-pointer">
+                                    {playerName}
+                                  </Link>
+                                ) : (
+                                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                                    {playerName}
+                                  </span>
+                                )}
+                                {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
+                                  <span className="text-[10px] font-black text-primary border border-primary/30 rounded px-1.5 py-0.5 uppercase tracking-tighter bg-primary/5">
+                                    {p.role === 'captain' && 'C'}
+                                    {p.role === 'wicket-keeper' && 'WK'}
+                                    {p.role === 'captain-wicket-keeper' && 'C & WK'}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{p.role === 'player' ? '' : p.role}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </CardContent>
                   </Card>
@@ -652,21 +599,34 @@ export default function MatchSpectator() {
                         {(match.sport === 'cricket' && rosterPlayers.length > 0 ?
                           rosterPlayers.filter(p => p.team === 'team2') :
                           participants.filter(p => p.team === 'team2')
-                        ).map((p: any, i: number) => (
-                          <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-muted-foreground/10">
-                            <p className="font-bold text-slate-900 dark:text-slate-100">
-                              {p.playerName || p.name || p.userId}
-                              {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
-                                <span className="ml-2 text-[10px] font-black text-primary border border-primary/30 rounded px-1.5 py-0.5 uppercase tracking-tighter bg-primary/5">
-                                  {p.role === 'captain' && 'C'}
-                                  {p.role === 'wicket-keeper' && 'WK'}
-                                  {p.role === 'captain-wicket-keeper' && 'C & WK'}
-                                </span>
-                              )}
-                            </p>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{p.role === 'player' ? '' : p.role}</span>
-                          </div>
-                        ))}
+                        ).map((p: any, i: number) => {
+                          const playerId = p.id || p.playerId || p.userId;
+                          const playerName = p.playerName || p.name || p.userId;
+
+                          return (
+                            <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-muted-foreground/10">
+                              <div className="flex items-center gap-2">
+                                {playerId ? (
+                                  <Link href={`/players/${playerId}`} className="font-bold text-slate-900 dark:text-slate-100 hover:text-primary transition-colors cursor-pointer">
+                                    {playerName}
+                                  </Link>
+                                ) : (
+                                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                                    {playerName}
+                                  </span>
+                                )}
+                                {p.role && (p.role === 'captain' || p.role === 'wicket-keeper' || p.role === 'captain-wicket-keeper') && (
+                                  <span className="text-[10px] font-black text-primary border border-primary/30 rounded px-1.5 py-0.5 uppercase tracking-tighter bg-primary/5">
+                                    {p.role === 'captain' && 'C'}
+                                    {p.role === 'wicket-keeper' && 'WK'}
+                                    {p.role === 'captain-wicket-keeper' && 'C & WK'}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{p.role === 'player' ? '' : p.role}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </CardContent>
                   </Card>
