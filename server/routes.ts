@@ -3461,6 +3461,9 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
         'gemini-2.0-flash-lite',
         'gemini-flash-latest',
         'gemini-flash-lite-latest',
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-8b',
+        'gemini-1.5-pro',
         'gemini-pro-latest'
       ];
       let lastError = "";
@@ -3529,6 +3532,9 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
           'gemini-2.0-flash-lite',
           'gemini-flash-latest',
           'gemini-flash-lite-latest',
+          'gemini-1.5-flash',
+          'gemini-1.5-flash-8b',
+          'gemini-1.5-pro',
           'gemini-pro-latest'
         ];
 
