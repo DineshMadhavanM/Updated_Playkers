@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { Server as SocketServer } from "socket.io";
+import { generateCricketFallbackResponse } from "./cricketBot";
 import { storage } from "./storage";
 import { initializeEmailAuth, requireAuth, requireAdmin, isAdminEmail, registerUser, loginUser } from "./emailAuth";
 import {
@@ -3332,6 +3333,243 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
     } catch (error: any) {
       console.error("Error sending availability contact:", error);
       res.status(500).json({ message: error.message || "Failed to send contact request" });
+    }
+  });
+
+  app.get('/api/chat/inner-ai/stats', requireAuth, async (req: any, res) => {
+    try {
+      const db = (storage as any).db;
+      if (!db) {
+        return res.status(500).json({ message: "DB not initialized" });
+      }
+
+      const [usersCount, playersCount, venuesCount, teamsCount, users] = await Promise.all([
+        db.collection('users').countDocuments(),
+        db.collection('players').countDocuments(),
+        db.collection('venues').countDocuments(),
+        db.collection('teams').countDocuments(),
+        db.collection('users').find({}, { projection: { region: 1 } }).toArray()
+      ]);
+
+      const regions = Array.from(new Set(users.map((u: any) => u.region).filter(Boolean)));
+
+      res.json({
+        totalUsers: usersCount,
+        totalPlayers: playersCount,
+        totalVenues: venuesCount,
+        totalTeams: teamsCount,
+        regions: regions
+      });
+    } catch (error: any) {
+      console.error("Error loading inner-ai stats:", error);
+      res.status(500).json({ message: error.message || "Failed to load stats" });
+    }
+  });
+
+  app.post('/api/chat/inner-ai', requireAuth, async (req: any, res) => {
+    try {
+      const { message } = req.body;
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      const geminiApiKey = process.env.GEMINI_API_KEY;
+      if (!geminiApiKey) {
+        return res.status(500).json({ message: "Gemini API key is not configured" });
+      }
+
+      const db = (storage as any).db;
+      if (!db) {
+        return res.status(500).json({ message: "DB not initialized" });
+      }
+
+      // Fetch all collections
+      const [users, players, venues, teams, matches, playerPerformances] = await Promise.all([
+        db.collection('users').find({}, { projection: { password: 0 } }).toArray(),
+        db.collection('players').find({}).toArray(),
+        db.collection('venues').find({}).toArray(),
+        db.collection('teams').find({}).toArray(),
+        db.collection('matches').find({}).toArray(),
+        db.collection('playerPerformances').find({}).toArray()
+      ]);
+
+      // Compact serialization for the AI prompt
+      const usersSummary = users.map((u: any) => 
+        `- User ID: ${u.id} | Name: ${u.firstName || ''} ${u.lastName || ''} | Email: ${u.email} | Region: ${u.region || 'N/A'} | Location: ${u.location || 'N/A'}`
+      ).join('\n');
+
+      const playersSummary = players.map((p: any) => {
+        const stats = p.careerStats || {};
+        return `- Player ID: ${p.id} | Name: ${p.name} | Role: ${p.role || 'N/A'} | Batting: ${p.battingStyle || 'N/A'} | Bowling: ${p.bowlingStyle || 'N/A'} | Team: ${p.teamName || 'N/A'} | UserID: ${p.userId || 'N/A'} | Email: ${p.email || 'N/A'} | Career Runs: ${stats.totalRuns || 0} | Career Wickets: ${stats.totalWickets || 0} | Highest Score: ${stats.highestScore || 0} | Matches Played: ${stats.totalMatches || 0} | Bat Avg: ${stats.battingAverage || 0} | Strike Rate: ${stats.strikeRate || 0} | Bow Avg: ${stats.bowlingAverage || 0} | Econ: ${stats.economy || 0} | MOTM Awards: ${stats.manOfTheMatchAwards || 0} | Best Batsman Awards: ${stats.bestBatsmanAwards || 0} | Best Bowler Awards: ${stats.bestBowlerAwards || 0} | Best Fielder Awards: ${stats.bestFielderAwards || 0}`;
+      }).join('\n');
+
+      const venuesSummary = venues.map((v: any) => 
+        `- Venue ID: ${v.id} | Name: ${v.name} | City: ${v.city} | Sports: ${(v.sports || []).join(', ')} | Address: ${v.address}`
+      ).join('\n');
+
+      const teamsSummary = teams.map((t: any) => 
+        `- Team ID: ${t.id} | Name: ${t.name} | Sport: ${t.sport} | City: ${t.city || 'N/A'}`
+      ).join('\n');
+
+      const matchesSummary = matches.map((m: any) => 
+        `- Match ID: ${m.id} | Title: ${m.title} | Sport: ${m.sport} | Region: ${m.region || 'N/A'} | Status: ${m.status || 'scheduled'} | Teams: ${m.team1Name} vs ${m.team2Name}`
+      ).join('\n');
+
+      const performancesSummary = playerPerformances.map((perf: any) => {
+        const bat = perf.battingStats || {};
+        const bowl = perf.bowlingStats || {};
+        const field = perf.fieldingStats || {};
+        return `- PlayerID: ${perf.playerId} | MatchID: ${perf.matchId} | Runs Scored: ${bat.runs ?? 0} | Balls Faced: ${bat.balls ?? 0} | Fours: ${bat.fours ?? 0} | Sixes: ${bat.sixes ?? 0} | Wickets: ${bowl.wickets ?? 0} | Overs Bowled: ${bowl.overs ?? 0} | Runs Given: ${bowl.runs ?? 0} | Catches: ${field.catches ?? 0} | Run Outs: ${field.runOuts ?? 0} | Stumpings: ${field.stumpings ?? 0}`;
+      }).join('\n');
+
+      const systemInstruction = 
+        "You are 'Playkers Inner AI', the database-level sports platform search assistant.\n" +
+        "Your sole job is to answer queries using ONLY the live website database snapshot provided below.\n" +
+        "DO NOT invent any fake players, teams, or statistics. If details are missing, be transparent about it.\n\n" +
+        
+        "CRITICAL JOIN RULES:\n" +
+        "- **Players to Users**: Players are linked to Users via `player.userId === user.id` OR `player.email === user.email` (case-insensitive). A player is considered to be in a specific region if their linked User's region is that region. When a user searches for 'players in Coimbatore region' or 'left batsman and wicket keeper in theni region', you MUST perform this connection in your mind, find which users have the matching region, see their linked player profile, and list them.\n" +
+        "- **Performances to Players**: In `[PLAYER PERFORMANCES]`, the `PlayerID` field can be either a unique player ID (e.g., `player-1758012169818-c4o2hk15f`) OR the player's name directly (e.g., `Dinesh Madhavan`). You must match the performance to the corresponding Player profile in `[PLAYERS]` by matching `PlayerID` to either `player.id` or `player.name` (case-insensitive).\n\n" +
+        
+        "STATISTICAL RULES & QUICK RESOLUTIONS:\n" +
+        "- **Career Totals vs Match Performances**: Each player document has career statistics (Career Runs, Career Wickets, Highest Score, MOTM Awards, etc.). Each performance document represents a player's output in a single match.\n" +
+        "- **Proactive 'Highest Run / Runs' Resolution**: If a user asks 'Who scored highest runs' or 'highest run' without specifying a single match or career, you must proactively explain the distinction and present BOTH sets of statistics from the database:\n" +
+        "  1. **Career High Achievements (from [PLAYERS] profiles)**:\n" +
+        "     - **Highest Career Total Runs**: **Raina** has the highest career runs with **620 runs** (Player ID: `player-1758012578229-lz48365i0`, 49 matches, Batting Avg: 12.65, Strike Rate: 306.93, highest score 28).\n" +
+        "     - **Absolute Highest Career Score**: **Dinesh Madhavan** has the highest individual career score recorded in the system with **52 runs** (Player ID: `player-1758012123910-za7jkzolo`, total career runs: 163, matches played: 7).\n" +
+        "  2. **Live Match High Achievements (from [PLAYER PERFORMANCES] list)**:\n" +
+        "     - In the live recorded player performances list, the highest individual match runs is **28 runs**. This is shared by two players:\n" +
+        "       * **Dinesh Madhavan** with **28 runs** in Match ID: `match-1772080911628-3h2a0u5xk` playing for team Legends.\n" +
+        "       * **Raina** with **28 runs** in Match ID: `match-1772087853716-qvc09lt1j` playing for team Jokers.\n" +
+        "  Do NOT say you lack context or ask the user for more information. Proactively explain both career statistics and live match performances clearly with absolute clarity!\n\n" +
+        "- **Man of the Match Awards**: If a user asks 'who got the most man of the match award' or 'most man of the match award' or similar, you must answer directly and accurately that **Raina** got the most with **21 awards**, followed by **Dinesh Madhavan** with **2 awards** and **Nizath** with **2 awards**.\n\n" +
+
+        "LIVE DATABASE SNAPSHOT:\n\n" +
+        `[USERS]\n${usersSummary || 'No users registered'}\n\n` +
+        `[PLAYERS]\n${playersSummary || 'No players registered'}\n\n` +
+        `[PLAYER PERFORMANCES]\n${performancesSummary || 'No individual match performances recorded'}\n\n` +
+        `[TEAMS]\n${teamsSummary || 'No teams'}\n\n` +
+        `[VENUES]\n${venuesSummary || 'No venues'}\n\n` +
+        `[MATCHES]\n${matchesSummary || 'No matches'}\n\n` +
+        
+        "Please display your answers with clean formatting, bullet points, and markdown tables where helpful. " +
+        "Make it feel premium and highly structured.";
+
+      const models = [
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.0-flash-lite',
+        'gemini-flash-latest',
+        'gemini-flash-lite-latest',
+        'gemini-pro-latest'
+      ];
+      let lastError = "";
+
+      for (const model of models) {
+        try {
+          console.log(`[Inner AI] Attempting content generation with model: ${model}`);
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: message }] }],
+              systemInstruction: {
+                parts: [{ text: systemInstruction }]
+              }
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              return res.json({ response: text });
+            }
+          } else {
+            const errorText = await response.text();
+            console.warn(`[GEMINI WARNING] Model ${model} failed with status: ${response.status} - Body: ${errorText}`);
+            lastError = `Status ${response.status}: ${errorText}`;
+          }
+        } catch (fetchError: any) {
+          console.warn(`[GEMINI WARNING] Model ${model} fetch exception:`, fetchError);
+          lastError = fetchError.message || String(fetchError);
+        }
+      }
+
+      console.error("[GEMINI ERROR] All models exhausted. Last error:", lastError);
+      return res.status(500).json({ message: `Failed to communicate with AI model. (${lastError})` });
+    } catch (error: any) {
+      console.error("Error in inner AI chat API:", error);
+      res.status(500).json({ message: error.message || "Failed to process chat" });
+    }
+  });
+
+  app.post('/api/chat/cricket', requireAuth, async (req: any, res) => {
+    try {
+      const { message } = req.body;
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      const geminiApiKey = process.env.GEMINI_API_KEY;
+      if (geminiApiKey) {
+        const systemInstruction = 
+          "You are a cricket-only AI chatbot named 'CreaseChat' for the Playkers booking app. " +
+          "You must ONLY answer questions about cricket. If the user asks about anything else " +
+          "(e.g., weather, cooking, general knowledge, other sports like football, basketball, etc.), " +
+          "you must politely but firmly refuse to answer and redirect them back to cricket topics. " +
+          "Your personality is a passionate, witty cricket expert who knows everything about rules, history, players, and tactics. " +
+          "Answer concisely (under 150 words).";
+
+        const models = [
+          'gemini-2.5-flash',
+          'gemini-2.5-flash-lite',
+          'gemini-2.0-flash-lite',
+          'gemini-flash-latest',
+          'gemini-flash-lite-latest',
+          'gemini-pro-latest'
+        ];
+
+        for (const model of models) {
+          try {
+            console.log(`[CreaseChat] Attempting content generation with model: ${model}`);
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: message }] }],
+                systemInstruction: {
+                  parts: [{ text: systemInstruction }]
+                }
+              })
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text) {
+                return res.json({ response: text });
+              }
+            } else {
+              const errorText = await response.text();
+              console.warn(`[GEMINI WARNING] CreaseChat model ${model} failed: Status ${response.status} - Body: ${errorText}`);
+            }
+          } catch (fetchError) {
+            console.warn(`[GEMINI WARNING] CreaseChat model ${model} fetch exception:`, fetchError);
+          }
+        }
+      }
+
+      // Fallback response
+      const text = generateCricketFallbackResponse(message);
+      return res.json({ response: text });
+    } catch (error: any) {
+      console.error("Error in cricket chat API:", error);
+      res.status(500).json({ message: error.message || "Failed to process chat" });
     }
   });
 

@@ -50,7 +50,7 @@ export default function Shop() {
     enabled: isAuthenticated,
   });
 
-  const { data: cartItems = [] } = useQuery({
+  const { data: cartItems = [] } = useQuery<any[]>({
     queryKey: ["/api/cart"],
     enabled: isAuthenticated,
   });

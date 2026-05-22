@@ -22,6 +22,8 @@ import Admin from "@/pages/admin";
 import PlayerProfile from "@/pages/player-profile";
 import AcceptInvite from "@/pages/accept-invite";
 import Availability from "./pages/Availability";
+import CricketAI from "@/pages/cricket-ai";
+import PlaykersAI from "@/pages/playkers-ai";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -63,6 +65,8 @@ function Router() {
       <Route path="/match/:id/spectate" component={MatchSpectator} />
       <Route path="/admin" component={Admin} />
       <Route path="/accept-invite/:token" component={AcceptInvite} />
+      <Route path="/cricket-ai" component={CricketAI} />
+      <Route path="/playkers-ai" component={PlaykersAI} />
       <Route component={NotFound} />
     </Switch>
   );

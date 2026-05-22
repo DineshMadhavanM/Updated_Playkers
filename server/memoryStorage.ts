@@ -818,6 +818,7 @@ export class MemoryStorage implements IStorage {
         bestBatsmanAwards: 0,
         bestBowlerAwards: 0,
         bestFielderAwards: 0,
+        processedMatches: [],
       },
       createdAt: new Date(),
       updatedAt: new Date(),

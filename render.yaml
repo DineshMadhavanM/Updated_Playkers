@@ -17,3 +17,5 @@ services:
         value: 316863142429247
       - key: CLOUDINARY_API_SECRET
         value: iyWwVpbjpwFmtgjR99kTXNohDJo
+      - key: GEMINI_API_KEY
+        value: AIzaSyCzj_aayqx2Wp5q9GDrfbYUcElwVZlvXt8
