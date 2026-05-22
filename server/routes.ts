@@ -3373,9 +3373,9 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
         return res.status(400).json({ message: "Message is required" });
       }
 
-      const geminiApiKey = process.env.GEMINI_API_KEY;
-      if (!geminiApiKey) {
-        return res.status(500).json({ message: "Gemini API key is not configured" });
+      const groqApiKey = process.env.GROQ_API_KEY;
+      if (!groqApiKey) {
+        return res.status(500).json({ message: "Groq API key is not configured" });
       }
 
       const db = (storage as any).db;
@@ -3455,53 +3455,52 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
         "Please display your answers with clean formatting, bullet points, and markdown tables where helpful. " +
         "Make it feel premium and highly structured.";
 
+      // Groq API - OpenAI-compatible format with model fallback
       const models = [
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-2.0-flash-lite',
-        'gemini-flash-latest',
-        'gemini-flash-lite-latest',
-        'gemini-1.5-flash',
-        'gemini-1.5-flash-8b',
-        'gemini-1.5-pro',
-        'gemini-pro-latest'
+        'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant',
+        'mixtral-8x7b-32768'
       ];
       let lastError = "";
 
       for (const model of models) {
         try {
-          console.log(`[Inner AI] Attempting content generation with model: ${model}`);
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`, {
+          console.log(`[Inner AI] Attempting Groq content generation with model: ${model}`);
+          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Authorization': `Bearer ${groqApiKey}`,
             },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: message }] }],
-              systemInstruction: {
-                parts: [{ text: systemInstruction }]
-              }
+              model: model,
+              messages: [
+                { role: 'system', content: systemInstruction },
+                { role: 'user', content: message }
+              ],
+              temperature: 0.7,
+              max_tokens: 4096,
             })
           });
 
           if (response.ok) {
             const data = await response.json();
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            const text = data.choices?.[0]?.message?.content;
             if (text) {
               return res.json({ response: text });
             }
           } else {
             const errorText = await response.text();
-            console.warn(`[GEMINI WARNING] Model ${model} failed with status: ${response.status} - Body: ${errorText}`);
+            console.warn(`[GROQ WARNING] Model ${model} failed with status: ${response.status} - Body: ${errorText}`);
             lastError = `Status ${response.status}: ${errorText}`;
           }
         } catch (fetchError: any) {
-          console.warn(`[GEMINI WARNING] Model ${model} fetch exception:`, fetchError);
+          console.warn(`[GROQ WARNING] Model ${model} fetch exception:`, fetchError);
           lastError = fetchError.message || String(fetchError);
         }
       }
 
-      console.error("[GEMINI ERROR] All models exhausted. Last error:", lastError);
+      console.error("[GROQ ERROR] All models exhausted. Last error:", lastError);
       return res.status(500).json({ message: `Failed to communicate with AI model. (${lastError})` });
     } catch (error: any) {
       console.error("Error in inner AI chat API:", error);
@@ -3516,8 +3515,8 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
         return res.status(400).json({ message: "Message is required" });
       }
 
-      const geminiApiKey = process.env.GEMINI_API_KEY;
-      if (geminiApiKey) {
+      const groqApiKey = process.env.GROQ_API_KEY;
+      if (groqApiKey) {
         const systemInstruction = 
           "You are a cricket-only AI chatbot named 'CreaseChat' for the Playkers booking app. " +
           "You must ONLY answer questions about cricket. If the user asks about anything else " +
@@ -3527,45 +3526,43 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
           "Answer concisely (under 150 words).";
 
         const models = [
-          'gemini-2.5-flash',
-          'gemini-2.5-flash-lite',
-          'gemini-2.0-flash-lite',
-          'gemini-flash-latest',
-          'gemini-flash-lite-latest',
-          'gemini-1.5-flash',
-          'gemini-1.5-flash-8b',
-          'gemini-1.5-pro',
-          'gemini-pro-latest'
+          'llama-3.3-70b-versatile',
+          'llama-3.1-8b-instant',
+          'mixtral-8x7b-32768'
         ];
 
         for (const model of models) {
           try {
-            console.log(`[CreaseChat] Attempting content generation with model: ${model}`);
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`, {
+            console.log(`[CreaseChat] Attempting Groq content generation with model: ${model}`);
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${groqApiKey}`,
               },
               body: JSON.stringify({
-                contents: [{ parts: [{ text: message }] }],
-                systemInstruction: {
-                  parts: [{ text: systemInstruction }]
-                }
+                model: model,
+                messages: [
+                  { role: 'system', content: systemInstruction },
+                  { role: 'user', content: message }
+                ],
+                temperature: 0.7,
+                max_tokens: 1024,
               })
             });
 
             if (response.ok) {
               const data = await response.json();
-              const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              const text = data.choices?.[0]?.message?.content;
               if (text) {
                 return res.json({ response: text });
               }
             } else {
               const errorText = await response.text();
-              console.warn(`[GEMINI WARNING] CreaseChat model ${model} failed: Status ${response.status} - Body: ${errorText}`);
+              console.warn(`[GROQ WARNING] CreaseChat model ${model} failed: Status ${response.status} - Body: ${errorText}`);
             }
           } catch (fetchError) {
-            console.warn(`[GEMINI WARNING] CreaseChat model ${model} fetch exception:`, fetchError);
+            console.warn(`[GROQ WARNING] CreaseChat model ${model} fetch exception:`, fetchError);
           }
         }
       }
