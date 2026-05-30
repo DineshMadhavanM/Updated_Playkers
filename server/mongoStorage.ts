@@ -2857,6 +2857,11 @@ export class MongoStorage implements IStorage {
     return post || undefined;
   }
 
+  async deleteMatchAvailability(id: string): Promise<boolean> {
+    const result = await this.matchAvailability.deleteOne({ id } as any);
+    return result.deletedCount > 0;
+  }
+
   // Player Availability methods
   async createPlayerAvailability(post: InsertPlayerAvailability): Promise<PlayerAvailability> {
     const id = `player-avail-${this.generateId()}`;
@@ -2879,6 +2884,11 @@ export class MongoStorage implements IStorage {
   async getPlayerAvailabilityById(id: string): Promise<PlayerAvailability | undefined> {
     const post = await this.playerAvailability.findOne({ id } as any);
     return post || undefined;
+  }
+
+  async deletePlayerAvailability(id: string): Promise<boolean> {
+    const result = await this.playerAvailability.deleteOne({ id } as any);
+    return result.deletedCount > 0;
   }
 
   // Achievement methods

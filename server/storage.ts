@@ -291,9 +291,11 @@ export interface IStorage {
   createMatchAvailability(post: InsertMatchAvailability): Promise<MatchAvailability>;
   getMatchAvailability(region: string): Promise<MatchAvailability[]>;
   getMatchAvailabilityById(id: string): Promise<MatchAvailability | undefined>;
+  deleteMatchAvailability(id: string): Promise<boolean>;
   createPlayerAvailability(post: InsertPlayerAvailability): Promise<PlayerAvailability>;
   getPlayerAvailability(region: string): Promise<PlayerAvailability[]>;
   getPlayerAvailabilityById(id: string): Promise<PlayerAvailability | undefined>;
+  deletePlayerAvailability(id: string): Promise<boolean>;
 
   // Achievement operations
   getAchievements(): Promise<Achievement[]>;

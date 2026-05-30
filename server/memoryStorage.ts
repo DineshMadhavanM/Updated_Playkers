@@ -228,6 +228,10 @@ export class MemoryStorage implements IStorage {
     return this.matchAvailability.get(id);
   }
 
+  async deleteMatchAvailability(id: string): Promise<boolean> {
+    return this.matchAvailability.delete(id);
+  }
+
   async createPlayerAvailability(postData: InsertPlayerAvailability): Promise<PlayerAvailability> {
     const post: PlayerAvailability = {
       id: uuidv4(),
@@ -247,6 +251,10 @@ export class MemoryStorage implements IStorage {
 
   async getPlayerAvailabilityById(id: string): Promise<PlayerAvailability | undefined> {
     return this.playerAvailability.get(id);
+  }
+
+  async deletePlayerAvailability(id: string): Promise<boolean> {
+    return this.playerAvailability.delete(id);
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {

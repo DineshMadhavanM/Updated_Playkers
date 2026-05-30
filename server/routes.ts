@@ -3295,6 +3295,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/availability/match/:id", requireAuth, async (req: any, res) => {
+    try {
+      const post = await storage.getMatchAvailabilityById(req.params.id);
+      if (!post) {
+        return res.status(404).json({ message: "Match availability post not found" });
+      }
+      if (post.authorId !== (req.user as any).id) {
+        return res.status(403).json({ message: "You are not authorized to delete this post" });
+      }
+      await storage.deleteMatchAvailability(req.params.id);
+      res.json({ message: "Match availability post deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting match availability:", error);
+      res.status(500).json({ message: error.message || "Failed to delete match availability post" });
+    }
+  });
+
 
 
 
@@ -3331,6 +3348,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching player availability:", error);
       res.status(500).json({ message: "Failed to fetch player availability" });
+    }
+  });
+
+  app.delete("/api/availability/player/:id", requireAuth, async (req: any, res) => {
+    try {
+      const post = await storage.getPlayerAvailabilityById(req.params.id);
+      if (!post) {
+        return res.status(404).json({ message: "Player availability post not found" });
+      }
+      if (post.authorId !== (req.user as any).id) {
+        return res.status(403).json({ message: "You are not authorized to delete this post" });
+      }
+      await storage.deletePlayerAvailability(req.params.id);
+      res.json({ message: "Player availability post deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting player availability:", error);
+      res.status(500).json({ message: error.message || "Failed to delete player availability post" });
     }
   });
 

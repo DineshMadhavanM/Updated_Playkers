@@ -15,7 +15,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/use-toast";
 import { apiRequest } from "../lib/queryClient";
 import { insertMatchAvailabilitySchema, insertPlayerAvailabilitySchema, type MatchAvailability, type PlayerAvailability } from "../../../shared/schema";
-import { Calendar as CalendarIcon, MapPin, User, Users, Info, Plus, Search, Trophy, TrendingUp, Filter, ArrowRight, Phone } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, User, Users, Info, Plus, Search, Trophy, TrendingUp, Filter, ArrowRight, Phone, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "../lib/utils";
 import { Calendar } from "../components/ui/calendar";
@@ -145,6 +145,40 @@ export default function Availability() {
         onError: (error: Error) => {
             toast({
                 title: "Failed to create post",
+                description: error.message,
+                variant: "destructive",
+            });
+        },
+    });
+
+    const deleteMatchPostMutation = useMutation({
+        mutationFn: async (postId: string) => {
+            await apiRequest("DELETE", `/api/availability/match/${postId}`);
+        },
+        onSuccess: () => {
+            toast({ title: "Post deleted", description: "Your match availability post has been deleted." });
+            queryClient.invalidateQueries({ queryKey: ["/api/availability/match"] });
+        },
+        onError: (error: Error) => {
+            toast({
+                title: "Failed to delete post",
+                description: error.message,
+                variant: "destructive",
+            });
+        },
+    });
+
+    const deletePlayerPostMutation = useMutation({
+        mutationFn: async (postId: string) => {
+            await apiRequest("DELETE", `/api/availability/player/${postId}`);
+        },
+        onSuccess: () => {
+            toast({ title: "Post deleted", description: "Your availability post has been deleted." });
+            queryClient.invalidateQueries({ queryKey: ["/api/availability/player"] });
+        },
+        onError: (error: Error) => {
+            toast({
+                title: "Failed to delete post",
                 description: error.message,
                 variant: "destructive",
             });
@@ -517,7 +551,20 @@ export default function Availability() {
                                                 <Badge className="bg-primary/10 text-primary border-primary/20 pointer-events-none">
                                                     {post.roleRequired} Required
                                                 </Badge>
-                                                <span className="text-xs text-muted-foreground">{format(new Date(post.createdAt), 'MMM d')}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-muted-foreground">{format(new Date(post.createdAt), 'MMM d')}</span>
+                                                    {user && post.authorId === user.id && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                            onClick={() => deleteMatchPostMutation.mutate(post.id)}
+                                                            title="Delete Post"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
                                             <CardTitle className="text-xl group-hover:text-primary transition-colors">{post.requiredPlayersCount} Players Needed</CardTitle>
                                             <CardDescription className="flex items-center gap-1">
@@ -568,7 +615,20 @@ export default function Availability() {
                                                 <Badge variant="outline" className="border-primary/30 text-primary pointer-events-none">
                                                     {post.experience}
                                                 </Badge>
-                                                <span className="text-xs text-muted-foreground">{format(new Date(post.createdAt), 'MMM d')}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-muted-foreground">{format(new Date(post.createdAt), 'MMM d')}</span>
+                                                    {user && post.authorId === user.id && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                            onClick={() => deletePlayerPostMutation.mutate(post.id)}
+                                                            title="Delete Post"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
                                             <CardTitle className="text-xl group-hover:text-primary transition-colors">{post.role}</CardTitle>
                                             <CardDescription className="flex items-center gap-1">
