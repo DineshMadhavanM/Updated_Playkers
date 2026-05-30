@@ -124,6 +124,12 @@ export default function Home() {
                   Browse Venues
                 </Button>
               </Link>
+              <Link href="/achievements">
+                <Button variant="secondary" size="lg" data-testid="button-view-achievements">
+                  <Trophy className="h-5 w-5 mr-2" />
+                  Achievements Feed
+                </Button>
+              </Link>
               <Link href="/create-match">
                 <Button variant="outline" size="lg" data-testid="button-create-match">
                   <Plus className="h-5 w-5 mr-2" />

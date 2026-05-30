@@ -46,6 +46,7 @@ export default function Navigation() {
     { href: "/matches", label: "Matches", active: location === "/matches" },
     { href: "/teams", label: "Teams", active: location.startsWith("/teams") },
     { href: "/availability", label: "Availability", active: location === "/availability" },
+    { href: "/achievements", label: "Achievements", active: location === "/achievements" },
     { href: "/shop", label: "Shop", active: location === "/shop" },
     { href: "/cricket-ai", label: "Cricket AI", active: location === "/cricket-ai" },
     { href: "/playkers-ai", label: "Playkers AI", active: location === "/playkers-ai" },

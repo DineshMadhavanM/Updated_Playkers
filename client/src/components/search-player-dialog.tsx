@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, User, Trophy, Target, X } from "lucide-react";
-import ContactPlayerDialog from "@/components/contact-player-dialog";
+import { Search, User, Trophy, Target, X, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLocation } from "wouter";
 
 interface Player {
   id: string;
@@ -29,6 +29,8 @@ interface Player {
   battingStyle: string | null;
   bowlingStyle: string | null;
   jerseyNumber: number | null;
+  region?: string | null;
+  location?: string | null;
   careerStats: {
     totalMatches: number;
     totalRuns: number;
@@ -46,11 +48,12 @@ interface SearchPlayerDialogProps {
 export default function SearchPlayerDialog({ trigger }: SearchPlayerDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [, setLocation] = useLocation();
 
-  const queryUrl = searchQuery 
-    ? `/api/players?search=${encodeURIComponent(searchQuery)}`
-    : "/api/players";
+  const params = new URLSearchParams();
+  if (searchQuery.trim()) params.set("search", searchQuery.trim());
+
+  const queryUrl = `/api/players?${params.toString()}`;
 
   const { data: players = [], isLoading } = useQuery<Player[]>({
     queryKey: [queryUrl],
@@ -64,6 +67,11 @@ export default function SearchPlayerDialog({ trigger }: SearchPlayerDialogProps)
       : name.substring(0, 2);
   };
 
+  const handlePlayerClick = (playerId: string) => {
+    setIsOpen(false);
+    setLocation(`/players/${playerId}`);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -74,37 +82,40 @@ export default function SearchPlayerDialog({ trigger }: SearchPlayerDialogProps)
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col" data-testid="dialog-search-player">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col" data-testid="dialog-search-player">
         <DialogHeader>
           <DialogTitle>Search Players</DialogTitle>
           <DialogDescription>
-            Search for players by name, team, or role
+            Search for players by name, team, role, region, or location
           </DialogDescription>
         </DialogHeader>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search players..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-player"
-          />
-          {searchQuery && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
-              onClick={() => setSearchQuery("")}
-              data-testid="button-clear-search"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
+        <div className="space-y-3">
+          {/* Main Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search players by name, team, role, region, or location..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-player"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
+                onClick={() => setSearchQuery("")}
+                data-testid="button-clear-search"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+        <div className="flex-1 overflow-y-auto pr-2 space-y-2 mt-4">
           {isLoading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4].map((i) => (
@@ -132,7 +143,7 @@ export default function SearchPlayerDialog({ trigger }: SearchPlayerDialogProps)
               <Card
                 key={player.id}
                 className="hover:bg-accent/50 transition-colors cursor-pointer"
-                onClick={() => setSelectedPlayer(player)}
+                onClick={() => handlePlayerClick(player.id)}
                 data-testid={`card-player-${player.id}`}
               >
                 <CardContent className="p-4">
@@ -165,6 +176,18 @@ export default function SearchPlayerDialog({ trigger }: SearchPlayerDialogProps)
                           {player.role && (
                             <Badge variant="outline" className="text-xs">
                               {player.role}
+                            </Badge>
+                          )}
+                          {player.region && (
+                            <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border-purple-200">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              {player.region} Region
+                            </Badge>
+                          )}
+                          {player.location && (
+                            <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              {player.location}
                             </Badge>
                           )}
                         </div>
@@ -206,16 +229,6 @@ export default function SearchPlayerDialog({ trigger }: SearchPlayerDialogProps)
           )}
         </div>
       </DialogContent>
-
-      {selectedPlayer && (
-        <ContactPlayerDialog
-          isOpen={!!selectedPlayer}
-          onClose={() => setSelectedPlayer(null)}
-          playerId={selectedPlayer.id}
-          playerName={selectedPlayer.name}
-          playerEmail={selectedPlayer.email}
-        />
-      )}
     </Dialog>
   );
 }

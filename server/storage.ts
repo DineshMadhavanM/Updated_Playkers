@@ -31,6 +31,8 @@ import type {
   InsertMatchAvailability,
   PlayerAvailability,
   InsertPlayerAvailability,
+  Achievement,
+  InsertAchievement,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -140,7 +142,7 @@ export interface IStorage {
   }): Promise<Team | undefined>;
 
   // Player operations
-  getPlayers(filters?: { teamId?: string; role?: string; search?: string; userId?: string }): Promise<Player[]>;
+  getPlayers(filters?: { teamId?: string; role?: string; search?: string; userId?: string; region?: string; location?: string }): Promise<Player[]>;
   getPlayer(id: string): Promise<Player | undefined>;
   getPlayerByUserId(userId: string): Promise<Player | undefined>;
   createPlayer(player: InsertPlayer): Promise<Player>;
@@ -288,17 +290,29 @@ export interface IStorage {
   // Availability post operations
   createMatchAvailability(post: InsertMatchAvailability): Promise<MatchAvailability>;
   getMatchAvailability(region: string): Promise<MatchAvailability[]>;
+  getMatchAvailabilityById(id: string): Promise<MatchAvailability | undefined>;
   createPlayerAvailability(post: InsertPlayerAvailability): Promise<PlayerAvailability>;
   getPlayerAvailability(region: string): Promise<PlayerAvailability[]>;
+  getPlayerAvailabilityById(id: string): Promise<PlayerAvailability | undefined>;
+
+  // Achievement operations
+  getAchievements(): Promise<Achievement[]>;
+  createAchievement(userId: string, data: InsertAchievement): Promise<Achievement>;
+  likeAchievement(id: string, userId: string): Promise<Achievement | undefined>;
+  commentAchievement(id: string, userId: string, userName: string, userAvatar: string | null, text: string): Promise<Achievement | undefined>;
+  deleteAchievement(id: string): Promise<boolean>;
+  updateAchievementsUserFields?(userId: string, userName: string, userAvatar: string | null): Promise<void>;
 }
 
 
 // MongoDB Storage Implementation
 import { MongoStorage } from './mongoStorage';
+import { MemoryStorage } from './memoryStorage';
 
 async function initializeStorage(): Promise<IStorage> {
   if (!process.env.MONGODB_URI) {
-    throw new Error('MONGODB_URI environment variable is required. Please configure your MongoDB connection string.');
+    console.warn('⚠️ MONGODB_URI not set. Falling back to in-memory storage.');
+    return new MemoryStorage();
   }
 
   console.log('🔍 MongoDB URI found, initializing MongoDB storage...');
@@ -308,7 +322,8 @@ async function initializeStorage(): Promise<IStorage> {
     return mongoStorage;
   } catch (error) {
     console.error('❌ Failed to connect to MongoDB:', error);
-    throw new Error(`Failed to initialize MongoDB storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.warn('⚠️ Falling back to in-memory storage...');
+    return new MemoryStorage();
   }
 }
 

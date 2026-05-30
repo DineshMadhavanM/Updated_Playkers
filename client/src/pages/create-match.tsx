@@ -71,6 +71,7 @@ export default function CreateMatch() {
   const prefilledSport = urlParams.get('sport');
   const prefilledTeam1Id = urlParams.get('team1');
   const prefilledTeam2Id = urlParams.get('team2');
+  const prefilledMatchType = urlParams.get('matchType');
 
   const team1Id = prefilledTeam1Id || "";
   const team2Id = prefilledTeam2Id || "";
@@ -169,17 +170,39 @@ export default function CreateMatch() {
     userId: dbPlayer.userId || undefined,
   });
 
+  // Prefill sport and match type on load if present in query parameters
+  useEffect(() => {
+    if (prefilledSport) {
+      form.setValue('sport', prefilledSport);
+      setSelectedSport(prefilledSport);
+    }
+    if (prefilledMatchType) {
+      form.setValue('matchType', prefilledMatchType);
+    }
+  }, [prefilledSport, prefilledMatchType, form]);
+
   useEffect(() => {
     if (prefilledTeam1) {
       form.setValue('team1Name', prefilledTeam1.name);
+      if (prefilledTeam1.city) {
+        form.setValue('region', prefilledTeam1.city);
+      }
+      const t2 = form.getValues('team2Name') || prefilledTeam2?.name;
+      if (prefilledTeam1.name && t2) {
+        form.setValue('title', `${prefilledTeam1.name} vs ${t2}`);
+      }
     }
-  }, [prefilledTeam1, form]);
+  }, [prefilledTeam1, prefilledTeam2, form]);
 
   useEffect(() => {
     if (prefilledTeam2) {
       form.setValue('team2Name', prefilledTeam2.name);
+      const t1 = form.getValues('team1Name') || prefilledTeam1?.name;
+      if (t1 && prefilledTeam2.name) {
+        form.setValue('title', `${t1} vs ${prefilledTeam2.name}`);
+      }
     }
-  }, [prefilledTeam2, form]);
+  }, [prefilledTeam1, prefilledTeam2, form]);
 
   // Initialize team rosters with available players when players are fetched
   useEffect(() => {

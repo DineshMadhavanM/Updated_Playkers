@@ -24,6 +24,7 @@ import AcceptInvite from "@/pages/accept-invite";
 import Availability from "./pages/Availability";
 import CricketAI from "@/pages/cricket-ai";
 import PlaykersAI from "@/pages/playkers-ai";
+import Achievements from "./pages/achievements";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -67,6 +68,7 @@ function Router() {
       <Route path="/accept-invite/:token" component={AcceptInvite} />
       <Route path="/cricket-ai" component={CricketAI} />
       <Route path="/playkers-ai" component={PlaykersAI} />
+      <Route path="/achievements" component={Achievements} />
       <Route component={NotFound} />
     </Switch>
   );

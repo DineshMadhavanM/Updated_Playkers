@@ -24,6 +24,7 @@ import {
   insertMatchAvailabilitySchema,
   insertPlayerAvailabilitySchema,
   profileUpdateSchema,
+  insertAchievementSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { v2 as cloudinary } from "cloudinary";
@@ -311,6 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     location: z.string().optional(),
     phoneNumber: z.string().optional(),
     region: z.string().optional(),
+    profileImageUrl: z.string().nullable().optional(),
   });
 
   app.put('/api/auth/user', requireAuth, async (req: any, res) => {
@@ -320,6 +322,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = profileUpdateSchema.parse(req.body);
       console.log('🔍 [PROFILE UPDATE] updateData.region after parse:', updateData.region);
 
+      // Get current user to preserve existing data
+      const currentUser = await storage.getUser(userId);
+      if (!currentUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
       // Convert empty string username to null for database
       const processedData = {
         ...updateData,
@@ -328,14 +336,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         location: updateData.location || null,
         phoneNumber: updateData.phoneNumber || null,
         region: updateData.region || null,
+        profileImageUrl: updateData.profileImageUrl !== undefined ? updateData.profileImageUrl : currentUser.profileImageUrl,
       };
       console.log('🔍 [PROFILE UPDATE] processedData.region:', processedData.region);
-
-      // Get current user to preserve existing data
-      const currentUser = await storage.getUser(userId);
-      if (!currentUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
 
       // Use upsertUser to update the profile
       const updatedUser = await storage.upsertUser({
@@ -344,7 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: processedData.username || null,
         firstName: processedData.firstName || null,
         lastName: processedData.lastName || null,
-        profileImageUrl: currentUser.profileImageUrl, // Preserve existing image
+        profileImageUrl: processedData.profileImageUrl,
         dateOfBirth: processedData.dateOfBirth ? new Date(processedData.dateOfBirth) : null,
         location: processedData.location || null,
         phoneNumber: processedData.phoneNumber || null,
@@ -352,6 +355,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isAdmin: currentUser.isAdmin || false, // Preserve existing admin status
       });
       console.log('🔍 [PROFILE UPDATE] updatedUser.region from DB:', updatedUser.region);
+
+      // Update achievements user name and avatar if method exists
+      if (storage.updateAchievementsUserFields) {
+        try {
+          await storage.updateAchievementsUserFields(
+            userId,
+            `${updatedUser.firstName} ${updatedUser.lastName}`,
+            updatedUser.profileImageUrl
+          );
+        } catch (achievementError) {
+          console.warn('Failed to update user fields in achievements:', achievementError);
+        }
+      }
 
       // Auto-link to player profile if email matches
       try {
@@ -1618,12 +1634,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Player routes
   app.get('/api/players', async (req, res) => {
     try {
-      const { teamId, role, search, userId } = req.query;
+      const { teamId, role, search, userId, region, location } = req.query;
       const players = await storage.getPlayers({
         teamId: teamId as string,
         role: role as string,
         search: search as string,
         userId: userId as string,
+        region: region as string,
+        location: location as string,
       });
       res.json(players);
     } catch (error) {
@@ -1650,7 +1668,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!player) {
         return res.status(404).json({ message: "Player not found" });
       }
-      res.json(player);
+
+      // Decorate player with linked user's region and location
+      let linkedUser = null;
+      if (player.userId) {
+        linkedUser = await storage.getUser(player.userId);
+      }
+      if (!linkedUser && player.email) {
+        linkedUser = await storage.getUserByEmail(player.email);
+      }
+
+      const decoratedPlayer = {
+        ...player,
+        region: linkedUser?.region || null,
+        location: linkedUser?.location || null,
+      };
+
+      res.json(decoratedPlayer);
     } catch (error) {
       console.error("Error fetching player:", error);
       res.status(500).json({ message: "Failed to fetch player" });
@@ -2770,6 +2804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           team1Id,
           team2Id,
           matchType: matchType || "Friendly",
+          sport: team1?.sport || undefined,
           message: message || `${team1?.name || 'A team'} has challenged ${team2?.name || 'your team'} to a ${matchType || 'Friendly'} match!`
         })
       ));
@@ -3302,11 +3337,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Name, phone number, and place are required" });
       }
 
-      const sender = await storage.getUser((req.user as any).id);
+      const userId = (req.user as any)?.id || req.session?.user?.id;
+      const sender = userId ? await storage.getUser(userId) : undefined;
 
-      // Store as a notification for the admin
-      const ADMIN_EMAIL = "kit27.ad17@gmail.com";
-      const adminUser = await storage.getUserByEmail(ADMIN_EMAIL);
+      // Find actual recipient (the post author)
+      let recipientUserId: string | null = null;
+      if (postId && postType) {
+        if (postType === "match") {
+          const post = await storage.getMatchAvailabilityById(postId);
+          if (post) {
+            recipientUserId = post.authorId;
+          }
+        } else if (postType === "player") {
+          const post = await storage.getPlayerAvailabilityById(postId);
+          if (post) {
+            recipientUserId = post.authorId;
+          }
+        }
+      }
+
+      // If no post author found, fallback to the site admin
+      if (!recipientUserId) {
+        const ADMIN_EMAIL = "kit27.ad17@gmail.com";
+        const adminUser = await storage.getUserByEmail(ADMIN_EMAIL);
+        if (adminUser) {
+          recipientUserId = adminUser.id;
+        }
+      }
+
+      if (!recipientUserId) {
+        return res.status(404).json({ message: "Recipient user not found" });
+      }
 
       const message = `Availability Contact Request:
 Type: ${postType || "availability"}
@@ -3316,18 +3377,16 @@ Phone: ${phoneNumber}
 Place: ${place}
 Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email || ""})`;
 
-      if (adminUser) {
-        await storage.createNotification({
-          recipientUserId: adminUser.id,
-          senderName: name,
-          senderEmail: sender?.email || "",
-          senderPhone: phoneNumber,
-          senderPlace: place,
-          type: "booking_request",
-          message: message,
-          preferredTiming: `Phone: ${phoneNumber} | Place: ${place}`,
-        });
-      }
+      await storage.createNotification({
+        recipientUserId: recipientUserId,
+        senderName: name,
+        senderEmail: sender?.email || "",
+        senderPhone: phoneNumber,
+        senderPlace: place,
+        type: "booking_request",
+        message: message,
+        preferredTiming: `Phone: ${phoneNumber} | Place: ${place}`,
+      });
 
       res.json({ message: "Contact request sent successfully" });
     } catch (error: any) {
@@ -3384,13 +3443,14 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
       }
 
       // Fetch all collections
-      const [users, players, venues, teams, matches, playerPerformances] = await Promise.all([
+      const [users, players, venues, teams, matches, playerPerformances, achievements] = await Promise.all([
         db.collection('users').find({}, { projection: { password: 0 } }).toArray(),
         db.collection('players').find({}).toArray(),
         db.collection('venues').find({}).toArray(),
         db.collection('teams').find({}).toArray(),
         db.collection('matches').find({}).toArray(),
-        db.collection('playerPerformances').find({}).toArray()
+        db.collection('playerPerformances').find({}).toArray(),
+        storage.getAchievements()
       ]);
 
       // Compact serialization for the AI prompt
@@ -3422,6 +3482,13 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
         return `- PlayerID: ${perf.playerId} | MatchID: ${perf.matchId} | Runs Scored: ${bat.runs ?? 0} | Balls Faced: ${bat.balls ?? 0} | Fours: ${bat.fours ?? 0} | Sixes: ${bat.sixes ?? 0} | Wickets: ${bowl.wickets ?? 0} | Overs Bowled: ${bowl.overs ?? 0} | Runs Given: ${bowl.runs ?? 0} | Catches: ${field.catches ?? 0} | Run Outs: ${field.runOuts ?? 0} | Stumpings: ${field.stumpings ?? 0}`;
       }).join('\n');
 
+      const achievementsSummary = achievements.map((a: any) => {
+        const likesCount = a.likes?.length || 0;
+        const commentsCount = a.comments?.length || 0;
+        const commentsTextList = (a.comments || []).map((c: any) => `${c.userName}: "${c.text}"`).join('; ');
+        return `- Post ID: ${a.id} | Author: ${a.userName} | Author UserID: ${a.userId} | Text: "${a.text}" | Likes: ${likesCount} | Comments Count: ${commentsCount} | Comments Details: [${commentsTextList}]`;
+      }).join('\n');
+
       const systemInstruction = 
         "You are 'Playkers Inner AI', the database-level sports platform search assistant.\n" +
         "Your sole job is to answer queries using ONLY the live website database snapshot provided below.\n" +
@@ -3443,6 +3510,7 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
         "       * **Raina** with **28 runs** in Match ID: `match-1772087853716-qvc09lt1j` playing for team Jokers.\n" +
         "  Do NOT say you lack context or ask the user for more information. Proactively explain both career statistics and live match performances clearly with absolute clarity!\n\n" +
         "- **Man of the Match Awards**: If a user asks 'who got the most man of the match award' or 'most man of the match award' or similar, you must answer directly and accurately that **Raina** got the most with **21 awards**, followed by **Dinesh Madhavan** with **2 awards** and **Nizath** with **2 awards**.\n\n" +
+        "- **Achievements / Posts**: If a user asks about achievements, posts, most liked post, or most commented post, look up `[ACHIEVEMENTS]`. You can find the most liked posts by looking at the Likes count and the most commented posts by looking at the Comments Count. You can quote the post texts and who wrote them.\n\n" +
 
         "LIVE DATABASE SNAPSHOT:\n\n" +
         `[USERS]\n${usersSummary || 'No users registered'}\n\n` +
@@ -3451,6 +3519,7 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
         `[TEAMS]\n${teamsSummary || 'No teams'}\n\n` +
         `[VENUES]\n${venuesSummary || 'No venues'}\n\n` +
         `[MATCHES]\n${matchesSummary || 'No matches'}\n\n` +
+        `[ACHIEVEMENTS]\n${achievementsSummary || 'No achievements / posts'}\n\n` +
         
         "Please display your answers with clean formatting, bullet points, and markdown tables where helpful. " +
         "Make it feel premium and highly structured.";
@@ -3576,6 +3645,94 @@ Sent by: ${sender?.firstName || ""} ${sender?.lastName || ""} (${sender?.email |
     } catch (error: any) {
       console.error("Error in cricket chat API:", error);
       res.status(500).json({ message: error.message || "Failed to process chat" });
+    }
+  });
+
+  // Achievements API Endpoints
+  app.get('/api/achievements', requireAuth, async (req, res) => {
+    try {
+      const achievements = await storage.getAchievements();
+      res.json(achievements);
+    } catch (error) {
+      console.error("Error fetching achievements:", error);
+      res.status(500).json({ message: "Failed to fetch achievements" });
+    }
+  });
+
+  app.post('/api/achievements', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session.user.id;
+      const data = insertAchievementSchema.parse(req.body);
+      const achievement = await storage.createAchievement(userId, data);
+      res.status(201).json(achievement);
+    } catch (error: any) {
+      console.error("Error creating achievement:", error);
+      res.status(400).json({ message: error.message || "Failed to create achievement" });
+    }
+  });
+
+  app.post('/api/achievements/:id/like', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session.user.id;
+      const updated = await storage.likeAchievement(req.params.id, userId);
+      if (!updated) {
+        return res.status(404).json({ message: "Achievement not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error liking achievement:", error);
+      res.status(500).json({ message: "Failed to like achievement" });
+    }
+  });
+
+  app.post('/api/achievements/:id/comment', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session.user.id;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const userName = `${user.firstName} ${user.lastName}`;
+      const userAvatar = user.profileImageUrl || null;
+
+      const { text } = req.body;
+      if (!text || typeof text !== 'string' || text.trim() === '') {
+        return res.status(400).json({ message: "Comment content cannot be empty" });
+      }
+
+      const updated = await storage.commentAchievement(req.params.id, userId, userName, userAvatar, text);
+      if (!updated) {
+        return res.status(404).json({ message: "Achievement not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error commenting on achievement:", error);
+      res.status(500).json({ message: "Failed to add comment" });
+    }
+  });
+
+  app.delete('/api/achievements/:id', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.session.user.id;
+      const user = await storage.getUser(userId);
+      const isAdmin = user?.isAdmin || false;
+
+      // Find the achievement first to check authorization
+      const achievements = await storage.getAchievements();
+      const achievement = achievements.find(a => a.id === req.params.id);
+      if (!achievement) {
+        return res.status(404).json({ message: "Achievement not found" });
+      }
+
+      if (achievement.userId !== userId && !isAdmin) {
+        return res.status(403).json({ message: "You don't have permission to delete this achievement" });
+      }
+
+      await storage.deleteAchievement(req.params.id);
+      res.sendStatus(204);
+    } catch (error) {
+      console.error("Error deleting achievement:", error);
+      res.status(500).json({ message: "Failed to delete achievement" });
     }
   });
 

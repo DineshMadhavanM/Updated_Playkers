@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { insertTeamSchema } from "@shared/schema";
 import type { InsertTeam, Team, Player } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 
 const ROLE_ICONS: Record<string, React.ReactNode> = {
   admin: <Crown className="h-4 w-4 text-yellow-500" />,
@@ -33,6 +34,7 @@ export default function EditTeam() {
   const teamId = params.id!;
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Fetch team data
   const { data: team, isLoading, error } = useQuery({
@@ -54,6 +56,12 @@ export default function EditTeam() {
     },
     enabled: !!teamId,
   });
+
+  // Check authorization
+  const isSiteAdmin = !!user?.isAdmin || (!!user?.email && user.email.toLowerCase() === "kit27.ad17@gmail.com");
+  const currentUserPlayer = user ? players.find((p) => p.userId === user.id) : null;
+  const currentUserTeamRole = (currentUserPlayer?.teamRole as string) || null;
+  const isAllowed = isSiteAdmin || currentUserTeamRole === "admin" || currentUserTeamRole === "co-admin";
 
   const form = useForm<InsertTeam>({
     resolver: zodResolver(insertTeamSchema),
@@ -123,8 +131,27 @@ export default function EditTeam() {
     updateTeamMutation.mutate(data);
   };
 
-  if (isLoading) {
+  if (isLoading || playersLoading) {
     return <EditTeamSkeleton />;
+  }
+
+  if (!isAllowed) {
+    return (
+      <div className="container mx-auto p-6 max-w-4xl">
+        <div className="text-center py-12">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Access Denied
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            You do not have permission to edit this team. Only Team Admins, Co-Admins, and the Site Admin can edit team details.
+          </p>
+          <Button onClick={() => navigate(`/teams/${teamId}`)}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Team Details
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (error || !team) {

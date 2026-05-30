@@ -27,6 +27,7 @@ export const profileUpdateSchema = z.object({
   location: z.string().optional(),
   phoneNumber: z.string().optional(),
   region: z.string().optional(),
+  profileImageUrl: z.string().nullable().optional(),
 });
 
 // Venue validation schemas
@@ -964,6 +965,8 @@ export type Player = {
   jerseyNumber: number | null;
   isGuest: boolean | null; // Guest players for temporary participation
   teamRole: "admin" | "co-admin" | "player" | null; // Team role: admin, co-admin, or regular player
+  region?: string | null;
+  location?: string | null;
 
   // Merge metadata (optional for backward compatibility)
   mergedFromPlayerIds?: string[]; // IDs of players that were merged into this one
@@ -1273,3 +1276,33 @@ export type PlayerAvailability = {
 };
 
 export type InsertPlayerAvailability = z.infer<typeof insertPlayerAvailabilitySchema>;
+
+// Achievement / Post Sharing validation schemas
+export const insertAchievementSchema = z.object({
+  text: z.string().min(1, "Post content cannot be empty"),
+  imageUrl: z.string().nullable().optional(),
+});
+
+export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
+
+export type Comment = {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string | null;
+  text: string;
+  createdAt: Date;
+};
+
+export type Achievement = {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string | null;
+  text: string;
+  imageUrl: string | null;
+  likes: string[]; // array of userIds
+  comments: Comment[];
+  createdAt: Date;
+  updatedAt: Date;
+};

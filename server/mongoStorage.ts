@@ -34,6 +34,8 @@ import type {
   InsertMatchAvailability,
   PlayerAvailability,
   InsertPlayerAvailability,
+  Achievement,
+  InsertAchievement,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -56,6 +58,7 @@ export class MongoStorage implements IStorage {
   private notifications: Collection<Notification>;
   private matchAvailability: Collection<MatchAvailability>;
   private playerAvailability: Collection<PlayerAvailability>;
+  private achievements: Collection<Achievement>;
 
   constructor(uri: string) {
     // Configure MongoDB client options for Replit compatibility
@@ -86,6 +89,7 @@ export class MongoStorage implements IStorage {
     this.notifications = this.db.collection<Notification>('notifications');
     this.matchAvailability = this.db.collection<MatchAvailability>('matchAvailability');
     this.playerAvailability = this.db.collection<PlayerAvailability>('playerAvailability');
+    this.achievements = this.db.collection<Achievement>('achievements');
   }
 
   async connect(): Promise<void> {
@@ -731,7 +735,7 @@ export class MongoStorage implements IStorage {
   }
 
   // Player operations
-  async getPlayers(filters?: { teamId?: string; role?: string; search?: string; userId?: string }): Promise<Player[]> {
+  async getPlayers(filters?: { teamId?: string; role?: string; search?: string; userId?: string; region?: string; location?: string }): Promise<Player[]> {
     let query: any = {};
 
     if (filters) {
@@ -744,13 +748,110 @@ export class MongoStorage implements IStorage {
       if (filters.userId) {
         query.userId = filters.userId;
       }
+      
       if (filters.search) {
-        query.name = new RegExp(filters.search, 'i');
+        const searchRegex = new RegExp(filters.search, 'i');
+        
+        // Find users matching search term in region or location
+        const matchingUsers = await this.users.find({
+          $or: [
+            { region: searchRegex },
+            { location: searchRegex }
+          ]
+        }).toArray();
+        
+        const matchingUserIds = matchingUsers.map(u => u.id);
+
+        const searchOrConditions: any[] = [
+          { name: searchRegex },
+          { role: searchRegex },
+          { teamName: searchRegex },
+          { email: searchRegex },
+        ];
+
+        if (matchingUserIds.length > 0) {
+          searchOrConditions.push({ userId: { $in: matchingUserIds } });
+          // Also match by email for players not linked by userId
+          const matchingUserEmails = matchingUsers.map(u => u.email?.toLowerCase().trim()).filter(Boolean);
+          if (matchingUserEmails.length > 0) {
+            searchOrConditions.push({ email: { $regex: new RegExp(matchingUserEmails.map(e => e!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'i') } });
+          }
+        }
+
+        query.$or = searchOrConditions;
+      }
+
+      if (filters.region && filters.region !== 'All Regions') {
+        const regionRegex = new RegExp(filters.region, 'i');
+        const matchingUsers = await this.users.find({ region: regionRegex }).toArray();
+        const matchingUserIds = matchingUsers.map(u => u.id);
+        const matchingUserEmails = matchingUsers.map(u => u.email.toLowerCase().trim()).filter(Boolean);
+
+        query.$and = query.$and || [];
+        query.$and.push({
+          $or: [
+            { userId: { $in: matchingUserIds } },
+            { email: { $in: matchingUserEmails } }
+          ]
+        });
+      }
+
+      if (filters.location) {
+        const locationRegex = new RegExp(filters.location, 'i');
+        const matchingUsers = await this.users.find({ location: locationRegex }).toArray();
+        const matchingUserIds = matchingUsers.map(u => u.id);
+        const matchingUserEmails = matchingUsers.map(u => u.email.toLowerCase().trim()).filter(Boolean);
+
+        query.$and = query.$and || [];
+        query.$and.push({
+          $or: [
+            { userId: { $in: matchingUserIds } },
+            { email: { $in: matchingUserEmails } }
+          ]
+        });
       }
     }
 
     const players = await this.players.find(query).sort({ createdAt: -1 }).toArray();
-    return players;
+
+    // Decorate each player with their linked user's region and location
+    const userIds = players.map(p => p.userId).filter(Boolean) as string[];
+    const emails = players.map(p => p.email?.toLowerCase().trim()).filter(Boolean) as string[];
+
+    let users: User[] = [];
+    if (userIds.length > 0 || emails.length > 0) {
+      users = await this.users.find({
+        $or: [
+          { id: { $in: userIds } },
+          { email: { $in: emails } }
+        ]
+      }).toArray();
+    }
+
+    const userByIdMap = new Map<string, User>();
+    const userByEmailMap = new Map<string, User>();
+    users.forEach(u => {
+      userByIdMap.set(u.id, u);
+      userByEmailMap.set(u.email.toLowerCase().trim(), u);
+    });
+
+    const decoratedPlayers = players.map(player => {
+      let linkedUser: User | undefined;
+      if (player.userId) {
+        linkedUser = userByIdMap.get(player.userId);
+      }
+      if (!linkedUser && player.email) {
+        linkedUser = userByEmailMap.get(player.email.toLowerCase().trim());
+      }
+
+      return {
+        ...player,
+        region: linkedUser?.region || null,
+        location: linkedUser?.location || null,
+      };
+    });
+
+    return decoratedPlayers;
   }
 
   async getPlayer(id: string): Promise<Player | undefined> {
@@ -2748,6 +2849,11 @@ export class MongoStorage implements IStorage {
     }).sort({ createdAt: -1 }).toArray();
   }
 
+  async getMatchAvailabilityById(id: string): Promise<MatchAvailability | undefined> {
+    const post = await this.matchAvailability.findOne({ id } as any);
+    return post || undefined;
+  }
+
   // Player Availability methods
   async createPlayerAvailability(post: InsertPlayerAvailability): Promise<PlayerAvailability> {
     const id = `player-avail-${this.generateId()}`;
@@ -2765,5 +2871,99 @@ export class MongoStorage implements IStorage {
     return await this.playerAvailability.find({
       region: { $regex: new RegExp(`^${region}$`, 'i') }
     }).sort({ createdAt: -1 }).toArray();
+  }
+
+  async getPlayerAvailabilityById(id: string): Promise<PlayerAvailability | undefined> {
+    const post = await this.playerAvailability.findOne({ id } as any);
+    return post || undefined;
+  }
+
+  // Achievement methods
+  async getAchievements(): Promise<Achievement[]> {
+    return await this.achievements.find().sort({ createdAt: -1 }).toArray();
+  }
+
+  async createAchievement(userId: string, data: InsertAchievement): Promise<Achievement> {
+    const user = await this.getUser(userId);
+    const userName = user ? `${user.firstName} ${user.lastName}` : "Anonymous Player";
+    const userAvatar = user?.profileImageUrl || null;
+
+    const id = `achievement-${this.generateId()}`;
+    const newAchievement: Achievement = {
+      id,
+      userId,
+      userName,
+      userAvatar,
+      text: data.text,
+      imageUrl: data.imageUrl || null,
+      likes: [],
+      comments: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await this.achievements.insertOne(newAchievement as any);
+    return newAchievement;
+  }
+
+  async likeAchievement(id: string, userId: string): Promise<Achievement | undefined> {
+    const achievement = await this.achievements.findOne({ id } as any);
+    if (!achievement) return undefined;
+
+    const likes = achievement.likes || [];
+    const index = likes.indexOf(userId);
+    const updatedLikes = [...likes];
+    if (index === -1) {
+      updatedLikes.push(userId);
+    } else {
+      updatedLikes.splice(index, 1);
+    }
+
+    const result = await this.achievements.findOneAndUpdate(
+      { id } as any,
+      { $set: { likes: updatedLikes, updatedAt: new Date() } },
+      { returnDocument: 'after' }
+    );
+    return result as Achievement || undefined;
+  }
+
+  async commentAchievement(id: string, userId: string, userName: string, userAvatar: string | null, text: string): Promise<Achievement | undefined> {
+    const commentId = `comment-${this.generateId()}`;
+    const newComment = {
+      id: commentId,
+      userId,
+      userName,
+      userAvatar,
+      text,
+      createdAt: new Date(),
+    };
+
+    const result = await this.achievements.findOneAndUpdate(
+      { id } as any,
+      {
+        $push: { comments: newComment as any },
+        $set: { updatedAt: new Date() }
+      },
+      { returnDocument: 'after' }
+    );
+    return result as Achievement || undefined;
+  }
+
+  async deleteAchievement(id: string): Promise<boolean> {
+    const result = await this.achievements.deleteOne({ id } as any);
+    return result.deletedCount > 0;
+  }
+
+  async updateAchievementsUserFields(userId: string, userName: string, userAvatar: string | null): Promise<void> {
+    // Update achievements posts where they are the author
+    await this.achievements.updateMany(
+      { userId } as any,
+      { $set: { userName, userAvatar, updatedAt: new Date() } } as any
+    );
+    // Update achievements comments where they are the commenter
+    await this.achievements.updateMany(
+      { "comments.userId": userId } as any,
+      { $set: { "comments.$[elem].userName": userName, "comments.$[elem].userAvatar": userAvatar } } as any,
+      { arrayFilters: [{ "elem.userId": userId }] } as any
+    );
   }
 }

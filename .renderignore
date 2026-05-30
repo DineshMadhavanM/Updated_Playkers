@@ -1,8 +1,38 @@
+# Dependencies
 node_modules
+
+# Build output
 dist
+
+# Environment variables
 .env
 .env.*
+
+# Logs
 *.log
+
+# Editor/OS
 .vscode
 .idea
 .DS_Store
+Thumbs.db
+
+# Debug files
+debug_*.txt
+debug_*.json
+debug_*.ts
+debug_*.js
+server_log.txt
+tsc_output.txt
+final_results.txt
+changes.txt
+
+# Replit
+.replit
+replit.nix
+replit.md
+
+# Misc
+attached_assets
+*.tar.gz
+.gemini/

@@ -84,13 +84,14 @@ export default function TeamDetail() {
   });
 
   // Determine current user's role in this team
+  const isSiteAdmin = !!user?.isAdmin || (!!user?.email && user.email.toLowerCase() === "kit27.ad17@gmail.com");
   const currentUserPlayer = user
     ? players.find((p) => p.userId === user.id)
     : null;
   const currentUserTeamRole = (currentUserPlayer?.teamRole as string) || null;
   const isAdminOrCoAdmin =
-    currentUserTeamRole === "admin" || currentUserTeamRole === "co-admin";
-  const isAdmin = currentUserTeamRole === "admin";
+    currentUserTeamRole === "admin" || currentUserTeamRole === "co-admin" || isSiteAdmin;
+  const isAdmin = currentUserTeamRole === "admin" || isSiteAdmin;
 
   if (teamLoading) {
     return <TeamDetailSkeleton />;

@@ -33,10 +33,13 @@ import type {
   InsertMatchAvailability,
   PlayerAvailability,
   InsertPlayerAvailability,
+  Achievement,
+  InsertAchievement,
 } from "@shared/schema";
 import type { IStorage } from './storage';
 
 export class MemoryStorage implements IStorage {
+  private achievements = new Map<string, Achievement>();
   private users = new Map<string, User>();
   private venues = new Map<string, Venue>();
   private matches = new Map<string, Match>();
@@ -221,6 +224,10 @@ export class MemoryStorage implements IStorage {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
+  async getMatchAvailabilityById(id: string): Promise<MatchAvailability | undefined> {
+    return this.matchAvailability.get(id);
+  }
+
   async createPlayerAvailability(postData: InsertPlayerAvailability): Promise<PlayerAvailability> {
     const post: PlayerAvailability = {
       id: uuidv4(),
@@ -236,6 +243,10 @@ export class MemoryStorage implements IStorage {
     return Array.from(this.playerAvailability.values())
       .filter((post) => post.region.toLowerCase() === region.toLowerCase())
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getPlayerAvailabilityById(id: string): Promise<PlayerAvailability | undefined> {
+    return this.playerAvailability.get(id);
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
@@ -746,19 +757,59 @@ export class MemoryStorage implements IStorage {
   }
 
   // Player operations
-  async getPlayers(filters?: { teamId?: string; role?: string; search?: string }): Promise<Player[]> {
+  async getPlayers(filters?: { teamId?: string; role?: string; search?: string; userId?: string; region?: string; location?: string }): Promise<Player[]> {
     let players = Array.from(this.players.values());
-    if (filters?.teamId) {
-      players = players.filter(p => p.teamId === filters.teamId);
+
+    // Decorate players with user region and location
+    const decoratedPlayers = players.map(player => {
+      let linkedUser: User | undefined;
+      if (player.userId) {
+        linkedUser = this.users.get(player.userId);
+      }
+      if (!linkedUser && player.email) {
+        const emailLower = player.email.toLowerCase().trim();
+        linkedUser = Array.from(this.users.values()).find(u => u.email.toLowerCase().trim() === emailLower);
+      }
+      return {
+        ...player,
+        region: linkedUser?.region || null,
+        location: linkedUser?.location || null
+      };
+    });
+
+    let filtered = decoratedPlayers;
+
+    if (filters) {
+      if (filters.teamId) {
+        filtered = filtered.filter(p => p.teamId === filters.teamId);
+      }
+      if (filters.role) {
+        filtered = filtered.filter(p => p.role === filters.role);
+      }
+      if (filters.userId) {
+        filtered = filtered.filter(p => p.userId === filters.userId);
+      }
+      if (filters.search) {
+        const search = filters.search.toLowerCase();
+        filtered = filtered.filter(p =>
+          p.name.toLowerCase().includes(search) ||
+          (p.role && p.role.toLowerCase().includes(search)) ||
+          (p.teamName && p.teamName.toLowerCase().includes(search)) ||
+          (p.region && p.region.toLowerCase().includes(search)) ||
+          (p.location && p.location.toLowerCase().includes(search))
+        );
+      }
+      if (filters.region && filters.region !== 'All Regions') {
+        const region = filters.region.toLowerCase();
+        filtered = filtered.filter(p => p.region?.toLowerCase() === region);
+      }
+      if (filters.location) {
+        const location = filters.location.toLowerCase();
+        filtered = filtered.filter(p => p.location?.toLowerCase().includes(location));
+      }
     }
-    if (filters?.role) {
-      players = players.filter(p => p.role === filters.role);
-    }
-    if (filters?.search) {
-      const search = filters.search.toLowerCase();
-      players = players.filter(p => p.name.toLowerCase().includes(search));
-    }
-    return players;
+
+    return filtered;
   }
 
   async getPlayer(id: string): Promise<Player | undefined> {
@@ -1120,5 +1171,101 @@ export class MemoryStorage implements IStorage {
     return this.notifications.delete(id);
   }
 
+  // Achievement operations
+  async getAchievements(): Promise<Achievement[]> {
+    return Array.from(this.achievements.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
 
+  async createAchievement(userId: string, data: InsertAchievement): Promise<Achievement> {
+    const user = this.users.get(userId);
+    const userName = user ? `${user.firstName} ${user.lastName}` : "Anonymous Player";
+    const userAvatar = user?.profileImageUrl || null;
+
+    const achievement: Achievement = {
+      id: uuidv4(),
+      userId,
+      userName,
+      userAvatar,
+      text: data.text,
+      imageUrl: data.imageUrl || null,
+      likes: [],
+      comments: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.achievements.set(achievement.id, achievement);
+    return achievement;
+  }
+
+  async likeAchievement(id: string, userId: string): Promise<Achievement | undefined> {
+    const achievement = this.achievements.get(id);
+    if (!achievement) return undefined;
+
+    const likes = achievement.likes || [];
+    const index = likes.indexOf(userId);
+    const updatedLikes = [...likes];
+    if (index === -1) {
+      updatedLikes.push(userId);
+    } else {
+      updatedLikes.splice(index, 1);
+    }
+
+    const updated = {
+      ...achievement,
+      likes: updatedLikes,
+      updatedAt: new Date(),
+    };
+    this.achievements.set(id, updated);
+    return updated;
+  }
+
+  async commentAchievement(id: string, userId: string, userName: string, userAvatar: string | null, text: string): Promise<Achievement | undefined> {
+    const achievement = this.achievements.get(id);
+    if (!achievement) return undefined;
+
+    const newComment = {
+      id: uuidv4(),
+      userId,
+      userName,
+      userAvatar,
+      text,
+      createdAt: new Date(),
+    };
+
+    const updated = {
+      ...achievement,
+      comments: [...(achievement.comments || []), newComment],
+      updatedAt: new Date(),
+    };
+    this.achievements.set(id, updated);
+    return updated;
+  }
+
+  async deleteAchievement(id: string): Promise<boolean> {
+    return this.achievements.delete(id);
+  }
+
+  async updateAchievementsUserFields(userId: string, userName: string, userAvatar: string | null): Promise<void> {
+    for (const achievement of Array.from(this.achievements.values())) {
+      let updated = false;
+      if (achievement.userId === userId) {
+        achievement.userName = userName;
+        achievement.userAvatar = userAvatar;
+        achievement.updatedAt = new Date();
+        updated = true;
+      }
+      if (achievement.comments) {
+        for (const comment of achievement.comments) {
+          if (comment.userId === userId) {
+            comment.userName = userName;
+            comment.userAvatar = userAvatar;
+            updated = true;
+          }
+        }
+      }
+      if (updated) {
+        this.achievements.set(achievement.id, achievement);
+      }
+    }
+  }
 }

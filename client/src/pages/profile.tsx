@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError, getDisplayName } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { Edit, Trophy, Calendar, MapPin, TrendingUp, Star, AlertCircle, UserCheck, ExternalLink, Check, X, User, Phone, Mail, Clock } from "lucide-react";
+import { Edit, Trophy, Calendar, MapPin, TrendingUp, Star, AlertCircle, UserCheck, ExternalLink, Check, X, User, Phone, Mail, Clock, Camera, Loader2 } from "lucide-react";
 import MatchCard from "@/components/match-card";
 import VenueCard from "@/components/venue-card";
 import VenueForm from "@/components/venue-form";
@@ -49,6 +49,7 @@ const profileSchema = z.object({
   location: z.string().optional(),
   phoneNumber: z.string().optional(),
   region: z.string().optional(),
+  profileImageUrl: z.string().nullable().optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -63,6 +64,46 @@ export default function Profile() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isBookingDetailsOpen, setIsBookingDetailsOpen] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("photo", file);
+
+    try {
+      setUploadingImage(true);
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Upload failed");
+      const data = await response.json();
+      
+      const currentValues = form.getValues();
+      await updateProfileMutation.mutateAsync({
+        ...currentValues,
+        profileImageUrl: data.url
+      });
+      
+      toast({
+        title: "Photo updated",
+        description: "Your profile photo has been successfully updated.",
+      });
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: "Could not upload image.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -90,6 +131,7 @@ export default function Profile() {
       location: "",
       phoneNumber: "",
       region: "",
+      profileImageUrl: "",
     },
   });
 
@@ -105,6 +147,7 @@ export default function Profile() {
         location: user.location || "",
         phoneNumber: user.phoneNumber || "",
         region: user.region || "",
+        profileImageUrl: user.profileImageUrl || "",
       });
     }
   }, [user, form]);
@@ -320,12 +363,28 @@ export default function Profile() {
           <Card>
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-                <Avatar className="h-24 w-24" data-testid="img-profile-avatar">
-                  <AvatarImage src={user?.profileImageUrl || undefined} alt="Profile" />
-                  <AvatarFallback className="text-2xl">
-                    {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
+                <div className="relative group">
+                  <Avatar className="h-24 w-24 border-2 border-border shadow-sm" data-testid="img-profile-avatar">
+                    <AvatarImage src={user?.profileImageUrl || undefined} alt="Profile" />
+                    <AvatarFallback className="text-2xl">
+                      {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <label className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full shadow-md cursor-pointer hover:bg-primary/95 transition-all border border-card">
+                    {uploadingImage ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Camera className="h-3.5 w-3.5" />
+                    )}
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleImageUpload}
+                      disabled={uploadingImage}
+                    />
+                  </label>
+                </div>
 
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">

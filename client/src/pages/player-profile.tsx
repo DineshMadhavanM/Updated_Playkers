@@ -178,6 +178,24 @@ export default function PlayerProfile() {
                     <span className="capitalize">{player.bowlingStyle.replace('-', ' ')}</span>
                   </div>
                 )}
+
+                {(player as any).region && (
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4 text-purple-500" />
+                    <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border-purple-200">
+                      {(player as any).region} Region
+                    </Badge>
+                  </div>
+                )}
+
+                {(player as any).location && (
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4 text-blue-500" />
+                    <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200">
+                      {(player as any).location}
+                    </Badge>
+                  </div>
+                )}
               </div>
             </div>
           </div>

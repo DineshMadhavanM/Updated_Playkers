@@ -23,6 +23,7 @@ export function useNotifications() {
         enabled: isAuthenticated,
         refetchInterval: 15000, // poll every 15 seconds
         refetchIntervalInBackground: false,
+        retry: false,
     });
 
     const count = data?.count ?? 0;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Bell, Check, X, MapPin, Trophy, Clock, Trash2,
@@ -56,15 +56,19 @@ export default function NotificationsDropdown() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const mutatingIdsRef = useRef<Set<string>>(new Set());
+  const autoMarkedRef = useRef(false);
 
   const { data: unreadCountData } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count"],
     refetchInterval: 30000,
+    retry: false,
   });
 
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
     enabled: isOpen,
+    retry: false,
   });
 
   // ── mutations ────────────────────────────────────────────────────────────
@@ -74,13 +78,31 @@ export default function NotificationsDropdown() {
     queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
   };
 
+  // Optimistically patch the local cache — NO refetch, breaks the loop
+  const patchLocalStatus = (id: string, newStatus: string) => {
+    queryClient.setQueryData<Notification[]>(["/api/notifications"], (old) =>
+      old?.map((n) => (n.id === id ? { ...n, status: newStatus as Notification["status"] } : n))
+    );
+    if (newStatus === "read") {
+      queryClient.setQueryData<{ count: number }>(["/api/notifications/unread-count"], (old) => ({
+        count: Math.max(0, (old?.count ?? 1) - 1),
+      }));
+    }
+  };
+
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "read" | "accepted" | "declined" }) => {
       const response = await apiRequest("PATCH", `/api/notifications/${id}/status`, { status });
       return response.json();
     },
-    onSuccess: invalidate,
-    onError: (error: any) => {
+    onMutate: ({ id, status }) => {
+      // Optimistic update — update cache immediately, no refetch
+      patchLocalStatus(id, status);
+    },
+    // Do NOT invalidate on success — the optimistic update is already applied
+    onError: (error: any, { id }) => {
+      // Remove from tracking so user can retry
+      mutatingIdsRef.current.delete(id);
       toast({ title: "Error", description: error.message || "Failed to update notification", variant: "destructive" });
     },
   });
@@ -100,6 +122,7 @@ export default function NotificationsDropdown() {
         params.set("sport", sport);
         if (team1Id) params.set("team1", team1Id);
         if (team2Id) params.set("team2", team2Id);
+        if (matchType) params.set("matchType", matchType);
         navigate(`/create-match?${params.toString()}`);
         setIsOpen(false);
       }
@@ -144,7 +167,11 @@ export default function NotificationsDropdown() {
       return response.json();
     },
     onSuccess: () => {
-      invalidate();
+      // Optimistically mark all as read locally
+      queryClient.setQueryData<Notification[]>(["/api/notifications"], (old) =>
+        old?.map((n) => (n.status === "unread" ? { ...n, status: "read" as const } : n))
+      );
+      queryClient.setQueryData<{ count: number }>(["/api/notifications/unread-count"], () => ({ count: 0 }));
       toast({ title: "All marked as read" });
     },
     onError: (error: any) => {
@@ -152,21 +179,32 @@ export default function NotificationsDropdown() {
     },
   });
 
-  // Auto-mark booking_accepted as read when dropdown opens
+  // Auto-mark booking_accepted as read when dropdown opens (one-shot)
   useEffect(() => {
-    if (isOpen && notifications.length > 0) {
-      notifications.forEach((n) => {
-        if (n.type === "booking_accepted" && n.status === "unread") {
-          updateStatusMutation.mutate({ id: n.id, status: "read" });
-        }
-      });
-    }
+    if (!isOpen || notifications.length === 0 || autoMarkedRef.current) return;
+    autoMarkedRef.current = true;
+
+    notifications.forEach((n) => {
+      if (n.type === "booking_accepted" && n.status === "unread" && !mutatingIdsRef.current.has(n.id)) {
+        mutatingIdsRef.current.add(n.id);
+        updateStatusMutation.mutate({ id: n.id, status: "read" });
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, notifications.length]);
+  }, [isOpen, notifications]);
+
+  // Reset auto-mark flag when dropdown closes
+  useEffect(() => {
+    if (!isOpen) {
+      autoMarkedRef.current = false;
+    }
+  }, [isOpen]);
 
   const handleMarkAsRead = (id: string) => {
+    if (mutatingIdsRef.current.has(id)) return; // already in-flight
     const notif = notifications.find((n) => n.id === id);
     if (notif?.status === "unread") {
+      mutatingIdsRef.current.add(id);
       updateStatusMutation.mutate({ id, status: "read" });
     }
   };
