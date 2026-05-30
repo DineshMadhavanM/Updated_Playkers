@@ -2646,6 +2646,7 @@ export class MongoStorage implements IStorage {
       email: invitationData.email,
       inviterName: invitationData.inviterName || 'Unknown',
       inviterId: invitationData.inviterId || '',
+      inviterPhone: invitationData.inviterPhone || null,
       invitationType: invitationData.invitationType,
       matchId: invitationData.matchId || null,
       teamId: invitationData.teamId || null,
@@ -2659,6 +2660,7 @@ export class MongoStorage implements IStorage {
       acceptedAt: null,
       acceptedByUserId: null,
       acceptedByPlayerId: null,
+      acceptedByPhone: null,
       expiresAt,
       createdAt: new Date(),
     };
@@ -2707,7 +2709,7 @@ export class MongoStorage implements IStorage {
     return result.modifiedCount > 0;
   }
 
-  async acceptInvitation(token: string, acceptData: { userId?: string; playerId?: string }): Promise<{ success: boolean; invitation?: Invitation; error?: string }> {
+  async acceptInvitation(token: string, acceptData: { userId?: string; playerId?: string; acceptedByPhone?: string | null }): Promise<{ success: boolean; invitation?: Invitation; error?: string }> {
     try {
       const invitation = await this.getInvitationByToken(token);
 
@@ -2729,6 +2731,7 @@ export class MongoStorage implements IStorage {
         acceptedAt: new Date(),
         acceptedByUserId: acceptData.userId || null,
         acceptedByPlayerId: acceptData.playerId || null,
+        acceptedByPhone: acceptData.acceptedByPhone || null,
       });
 
       return { success: true, invitation: updatedInvitation };

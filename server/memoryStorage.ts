@@ -1044,6 +1044,7 @@ export class MemoryStorage implements IStorage {
       email: invitationData.email,
       inviterName: invitationData.inviterName || "Unknown",
       inviterId: invitationData.inviterId || "Unknown",
+      inviterPhone: invitationData.inviterPhone || null,
       invitationType: invitationData.invitationType,
       matchType: invitationData.matchType || null,
       matchId: invitationData.matchId || null,
@@ -1058,6 +1059,7 @@ export class MemoryStorage implements IStorage {
       acceptedAt: null,
       acceptedByUserId: null,
       acceptedByPlayerId: null,
+      acceptedByPhone: null,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       createdAt: new Date(),
     };
@@ -1102,7 +1104,8 @@ export class MemoryStorage implements IStorage {
       status: 'accepted',
       acceptedAt: new Date(),
       acceptedByUserId: data.userId || null,
-      acceptedByPlayerId: data.playerId || null
+      acceptedByPlayerId: data.playerId || null,
+      acceptedByPhone: data.acceptedByPhone || null
     });
     return { success: true, invitation: updated };
   }

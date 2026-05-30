@@ -1123,6 +1123,7 @@ export const insertInvitationSchema = z.object({
   email: z.string().email("Valid email is required"),
   inviterName: z.string().min(1, "Inviter name is required").optional(),
   inviterId: z.string().optional(),
+  inviterPhone: z.string().optional().nullable(),
   invitationType: z.enum(["match", "team"]),
   matchType: z.enum(["Friendly", "League"]).optional(),
   matchId: z.string().optional(),
@@ -1132,6 +1133,7 @@ export const insertInvitationSchema = z.object({
   matchTitle: z.string().optional(),
   teamName: z.string().optional(),
   message: z.string().optional(),
+  acceptedByPhone: z.string().optional().nullable(),
 }).refine((data) => {
   if (data.invitationType === "match" && !data.matchId && !data.matchType) {
     return false;
@@ -1149,6 +1151,7 @@ export const acceptInvitationSchema = z.object({
   guestPlayerData: z.object({
     name: z.string().min(1, "Name is required"),
     email: z.string().email("Valid email is required"),
+    phoneNumber: z.string().optional().nullable(),
   }).optional(),
 });
 
@@ -1159,6 +1162,7 @@ export type Invitation = {
   email: string;
   inviterName: string;
   inviterId: string;
+  inviterPhone: string | null;
   invitationType: "match" | "team";
   matchType: "Friendly" | "League" | null;
   matchId: string | null;
@@ -1172,6 +1176,7 @@ export type Invitation = {
   acceptedAt: Date | null;
   acceptedByUserId: string | null;
   acceptedByPlayerId: string | null;
+  acceptedByPhone: string | null;
   expiresAt: Date;
   createdAt: Date;
 };

@@ -2561,6 +2561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...validatedData,
         inviterName: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email,
         inviterId: user.id,
+        inviterPhone: user.phoneNumber || null,
       };
 
       const invitation = await storage.createInvitation(invitationData);
@@ -2665,6 +2666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let playerId: string | undefined;
+      let acceptedByPhone: string | null = null;
 
       // If guest player data is provided, create a guest player
       if (guestPlayerData) {
@@ -2675,6 +2677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           teamId: invitation.teamId || undefined,
         });
         playerId = player.id;
+        acceptedByPhone = guestPlayerData.phoneNumber || null;
       } else if (user) {
         // For authenticated users, try to find or create their player profile
         let player = await storage.getPlayerByUserId(user.id);
@@ -2687,12 +2690,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         playerId = player.id;
+        acceptedByPhone = user.phoneNumber || null;
       }
 
       // Accept the invitation
       const result = await storage.acceptInvitation(token, {
         userId: user?.id,
         playerId,
+        acceptedByPhone,
       });
 
       if (!result.success) {

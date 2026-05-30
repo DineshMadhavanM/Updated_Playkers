@@ -22,6 +22,7 @@ import { apiRequest } from "@/lib/queryClient";
 const guestPlayerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Valid email is required"),
+  phoneNumber: z.string().optional().or(z.literal("")),
 });
 
 type GuestPlayerData = z.infer<typeof guestPlayerSchema>;
@@ -38,6 +39,7 @@ export default function AcceptInvite() {
     defaultValues: {
       name: "",
       email: "",
+      phoneNumber: "",
     },
   });
 
@@ -251,6 +253,24 @@ export default function AcceptInvite() {
                           type="email"
                           placeholder="john@example.com"
                           data-testid="input-guest-email"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Your Phone Number (Optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="+1234567890"
+                          data-testid="input-guest-phone"
                         />
                       </FormControl>
                       <FormMessage />

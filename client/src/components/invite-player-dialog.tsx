@@ -590,6 +590,11 @@ export default function InvitePlayerDialog({
                                     Sender ID: <span className="font-mono font-medium">{invitation.inviterId}</span>
                                   </p>
                                 )}
+                                {invitation.inviterPhone && (
+                                  <p className="text-xs" data-testid={`text-sender-phone-${invitation.id}`}>
+                                    Phone: <span className="font-medium text-foreground">{invitation.inviterPhone}</span>
+                                  </p>
+                                )}
                               </div>
                             )}
                           </div>
@@ -688,6 +693,11 @@ export default function InvitePlayerDialog({
                             {invitation.acceptedByPlayerId && (
                               <p className="text-muted-foreground" data-testid={`text-receiver-player-id-${invitation.id}`}>
                                 Receiver Player ID: <span className="font-mono font-medium text-foreground">{invitation.acceptedByPlayerId}</span>
+                              </p>
+                            )}
+                            {invitation.acceptedByPhone && (
+                              <p className="text-muted-foreground" data-testid={`text-receiver-phone-${invitation.id}`}>
+                                Receiver Phone: <span className="font-medium text-foreground">{invitation.acceptedByPhone}</span>
                               </p>
                             )}
                           </div>
