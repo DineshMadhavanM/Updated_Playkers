@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { Copy, Mail, Link as LinkIcon, UserPlus, Loader2, Check, X } from "lucide-react";
+import { Copy, Mail, Link as LinkIcon, UserPlus, Loader2, Check, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -239,6 +239,34 @@ export default function InvitePlayerDialog({
       toast({
         title: "Error",
         description: error.message || "Failed to revoke invitation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete invitation mutation
+  const deleteInvitationMutation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      const response = await apiRequest("DELETE", `/api/invitations/${invitationId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate all invitation queries to ensure fresh data
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          typeof query.queryKey[0] === 'string' &&
+          query.queryKey[0].startsWith('/api/invitations')
+      });
+      toast({
+        title: "Invitation deleted",
+        description: "The invitation has been deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete invitation",
         variant: "destructive",
       });
     },
@@ -599,9 +627,21 @@ export default function InvitePlayerDialog({
                             )}
                           </div>
                         </div>
-                        <Badge variant={getStatusColor(invitation.status)}>
-                          {invitation.status}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={getStatusColor(invitation.status)}>
+                            {invitation.status}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => deleteInvitationMutation.mutate(invitation.id)}
+                            disabled={deleteInvitationMutation.isPending}
+                            title="Delete Invitation"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent className="pt-0">

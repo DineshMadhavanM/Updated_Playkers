@@ -2709,6 +2709,11 @@ export class MongoStorage implements IStorage {
     return result.modifiedCount > 0;
   }
 
+  async deleteInvitation(id: string): Promise<boolean> {
+    const result = await this.invitations.deleteOne({ id } as any);
+    return result.deletedCount > 0;
+  }
+
   async acceptInvitation(token: string, acceptData: { userId?: string; playerId?: string; acceptedByPhone?: string | null }): Promise<{ success: boolean; invitation?: Invitation; error?: string }> {
     try {
       const invitation = await this.getInvitationByToken(token);

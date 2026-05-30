@@ -2728,21 +2728,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Invitation not found" });
       }
 
-      // Only the inviter can revoke
-      if (invitation.inviterId !== user.id) {
-        return res.status(403).json({ message: "You can only revoke your own invitations" });
+      // Allow deletion if the user is either the inviter or the recipient
+      if (invitation.inviterId !== user.id && invitation.email !== user.email) {
+        return res.status(403).json({ message: "You are not authorized to delete this invitation" });
       }
 
-      const success = await storage.revokeInvitation(req.params.id);
+      const success = await storage.deleteInvitation(req.params.id);
 
       if (success) {
-        res.json({ message: "Invitation revoked successfully" });
+        res.json({ message: "Invitation deleted successfully" });
       } else {
-        res.status(500).json({ message: "Failed to revoke invitation" });
+        res.status(500).json({ message: "Failed to delete invitation" });
       }
     } catch (error) {
-      console.error("Error revoking invitation:", error);
-      res.status(500).json({ message: "Failed to revoke invitation" });
+      console.error("Error deleting invitation:", error);
+      res.status(500).json({ message: "Failed to delete invitation" });
     }
   });
 

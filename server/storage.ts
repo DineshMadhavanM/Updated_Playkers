@@ -277,6 +277,7 @@ export interface IStorage {
   getInvitations(filters?: { inviterId?: string; email?: string; matchId?: string; teamId?: string; status?: string }): Promise<Invitation[]>;
   updateInvitation(id: string, data: Partial<Invitation>): Promise<Invitation | undefined>;
   revokeInvitation(id: string): Promise<boolean>;
+  deleteInvitation(id: string): Promise<boolean>;
   acceptInvitation(token: string, acceptData: { userId?: string; playerId?: string; acceptedByPhone?: string | null }): Promise<{ success: boolean; invitation?: Invitation; error?: string }>;
   cleanupExpiredInvitations(): Promise<number>;
 

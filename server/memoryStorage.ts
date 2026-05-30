@@ -1105,6 +1105,10 @@ export class MemoryStorage implements IStorage {
     return this.invitations.delete(id);
   }
 
+  async deleteInvitation(id: string): Promise<boolean> {
+    return this.invitations.delete(id);
+  }
+
   async acceptInvitation(token: string, data: any): Promise<any> {
     const inv = await this.getInvitationByToken(token);
     if (!inv) return { success: false, error: 'Invalid token' };
